@@ -1,0 +1,57 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-navy: #0d2438;
+  --color-navy2: #17344d;
+  --color-ink: #142332;
+  --color-muted: #546575;
+  --color-paper: #f5f7f8;
+  --color-line: #d8e0e5;
+  --color-line2: #e8edf0;
+  --color-gold: #c89b3c;
+  --color-gold2: #f0dfb3;
+  --color-pine: #23725a;
+  --color-pine-bg: #e7f2ed;
+  --color-brick: #a2473d;
+  --color-brick-bg: #f8ebe8;
+  --color-amber-bg: #fbf1dc;
+  --color-steel: #346785;
+  --color-steel-bg: #e9f1f6;
+
+  --font-display: 'Palanquin', 'Montserrat', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Montserrat', 'Palanquin', system-ui, -apple-system, sans-serif;
+
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-slide-in-right: slide-in-right 0.25s ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    margin: 0;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+}
