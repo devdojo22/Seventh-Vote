@@ -1,4 +1,4 @@
-import { LABEL_CLASS } from './form';
+import { LABEL_CLASS } from './Field';
 
 interface RadioPillGroupProps<T extends string> {
   legend: string;
@@ -9,7 +9,6 @@ interface RadioPillGroupProps<T extends string> {
   className?: string;
 }
 
-/** A labelled row of radio pills for a small fixed set of values. */
 export function RadioPillGroup<T extends string>({
   legend,
   name,
@@ -21,16 +20,16 @@ export function RadioPillGroup<T extends string>({
   return (
     <fieldset className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
       <legend className={`${LABEL_CLASS} mb-1.5`}>{legend}</legend>
-      <div className="flex flex-wrap gap-2 pt-1">
+      <div className="inline-flex flex-wrap gap-1 self-start rounded-xl border border-line bg-paper p-1">
         {options.map((o) => {
           const checked = value === o.value;
           return (
             <label
               key={o.value}
-              className={`inline-flex cursor-pointer items-center justify-center rounded-lg border px-3.5 py-1.5 text-xs font-semibold transition-all select-none has-focus-visible:ring-2 has-focus-visible:ring-gold sm:text-sm ${
+              className={`inline-flex cursor-pointer items-center justify-center rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-all select-none has-focus-visible:ring-2 has-focus-visible:ring-gold ${
                 checked
-                  ? 'border-navy bg-navy text-gold shadow-xs'
-                  : 'border-line bg-white text-navy/80 hover:border-navy/30 hover:bg-paper/50'
+                  ? 'bg-white text-navy shadow-card ring-1 ring-line'
+                  : 'text-muted hover:text-navy'
               }`}
             >
               <input

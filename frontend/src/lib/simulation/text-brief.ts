@@ -23,7 +23,6 @@ function pivotalLine(analysis: SessionAnalysis): string {
   return `Pivotal members (${role}): ${names.join(', ')}`;
 }
 
-/** Plain-text rehearsal brief for download. */
 export function textBrief(analysis: SessionAnalysis, input: SessionInput): string {
   const { rows, voting, rule } = analysis;
   return [

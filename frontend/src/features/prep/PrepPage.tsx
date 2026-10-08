@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Disclaimer } from '@/components/Disclaimer';
-import { CONTROL_CLASS, Field, PRIMARY_BUTTON_CLASS } from '@/components/form';
 import { PageHeader } from '@/components/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { CONTROL_CLASS, Field } from '@/components/ui/Field';
 import { CATEGORY_LABELS } from '@/data/agenda';
 import type { PrepValues } from '@/lib/simulation/prep-brief';
 import { useAppStore } from '@/stores/app-store';
@@ -49,88 +50,79 @@ export function PrepPage() {
   };
 
   return (
-    <section className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+    <section className="space-y-8">
       <PageHeader
+        eyebrow="1-on-1 Prep"
         title="Prepare for one conversation"
         description="Turn the public record into a focused rehearsal brief — framing, objections, likely questions, and a path to the requested action."
       />
 
-      <form
-        className="space-y-6 rounded-2xl border border-line bg-white p-4 shadow-sm sm:p-6 lg:p-8"
-        noValidate
-        onSubmit={(e) => void handleSubmit(build)(e)}
-      >
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-6">
-          <Field id="prep-member" label="Council member" error={errors.memberId?.message}>
-            <select id="prep-member" className={CONTROL_CLASS} {...register('memberId')}>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} — {m.district}
-                </option>
-              ))}
-            </select>
-          </Field>
+      <Card padded={false}>
+        <form noValidate onSubmit={(e) => void handleSubmit(build)(e)}>
+          <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-3 sm:p-7">
+            <Field id="prep-member" label="Council member" error={errors.memberId?.message}>
+              <select id="prep-member" className={CONTROL_CLASS} {...register('memberId')}>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} — {m.district}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-          <Field id="prep-category" label="Category">
-            <select id="prep-category" className={CONTROL_CLASS} {...register('category')}>
-              {CATEGORY_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {CATEGORY_LABELS[id]}
-                </option>
-              ))}
-            </select>
-          </Field>
+            <Field id="prep-category" label="Category">
+              <select id="prep-category" className={CONTROL_CLASS} {...register('category')}>
+                {CATEGORY_IDS.map((id) => (
+                  <option key={id} value={id}>
+                    {CATEGORY_LABELS[id]}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-          <Field id="prep-ask" label="The ask">
-            <select id="prep-ask" className={CONTROL_CLASS} {...register('ask')}>
-              {ASKS.map((ask) => (
-                <option key={ask} value={ask}>
-                  {ask}
-                </option>
-              ))}
-            </select>
-          </Field>
+            <Field id="prep-ask" label="The ask">
+              <select id="prep-ask" className={CONTROL_CLASS} {...register('ask')}>
+                {ASKS.map((ask) => (
+                  <option key={ask} value={ask}>
+                    {ask}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-          <Field
-            id="prep-item"
-            label="Your pitch"
-            required
-            error={errors.pitch?.message}
-            className="sm:col-span-3"
-          >
-            <textarea
+            <Field
               id="prep-item"
+              label="Your pitch"
               required
-              rows={3}
-              aria-invalid={Boolean(errors.pitch)}
-              aria-describedby={errors.pitch ? 'prep-item-error' : undefined}
-              className={`${CONTROL_CLASS} min-h-[90px] resize-y`}
-              {...register('pitch')}
-            />
-          </Field>
-        </div>
+              error={errors.pitch?.message}
+              className="sm:col-span-3"
+            >
+              <textarea
+                id="prep-item"
+                required
+                rows={4}
+                aria-invalid={Boolean(errors.pitch)}
+                aria-describedby={errors.pitch ? 'prep-item-error' : undefined}
+                className={`${CONTROL_CLASS} min-h-[110px] resize-y leading-relaxed`}
+                {...register('pitch')}
+              />
+            </Field>
+          </div>
 
-        <div className="flex flex-col items-center gap-3 border-t border-line pt-4 sm:flex-row">
-          <button type="submit" className={PRIMARY_BUTTON_CLASS}>
-            Build rehearsal brief
-          </button>
-          <button
-            type="button"
-            onClick={loadSessionItem}
-            className="w-full cursor-pointer rounded-xl border border-line bg-paper px-6 py-3 font-display text-sm font-semibold tracking-wider text-navy uppercase shadow-2xs transition-colors hover:bg-paper/80 focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none sm:w-auto"
-          >
-            Use current session item
-          </button>
-        </div>
-      </form>
+          <div className="flex flex-col gap-3 rounded-b-2xl border-t border-line bg-paper/60 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
+            <Button variant="secondary" onClick={loadSessionItem}>
+              Use current session item
+            </Button>
+            <Button type="submit">Build rehearsal brief</Button>
+          </div>
+        </form>
+      </Card>
 
       {brief && (
-        <div ref={briefRef}>
+        <div ref={briefRef} className="animate-fade-in scroll-mt-20">
           <PrepBriefCard brief={brief} />
         </div>
       )}
-
-      <Disclaimer />
     </section>
   );
 }

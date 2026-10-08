@@ -1,4 +1,10 @@
 import { SourceList } from '@/components/SourceList';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Callout } from '@/components/ui/Callout';
+import { Card } from '@/components/ui/Card';
+import { DownloadIcon } from '@/components/ui/icons';
+import { SectionHeading } from '@/components/ui/SectionHeading';
 import { CATEGORY_LABELS } from '@/data/agenda';
 import { downloadText } from '@/lib/download';
 import { citations } from '@/lib/simulation/scoring';
@@ -9,14 +15,8 @@ import { ConsentPanel } from './ConsentPanel';
 import { MemberReadCard } from './MemberReadCard';
 import { OutreachList } from './OutreachList';
 import { PivotalPanel } from './PivotalPanel';
-import { SectionHeading } from './SectionHeading';
 import { TallyPanel } from './TallyPanel';
 import { ThresholdFigure } from './ThresholdFigure';
-
-const CALLOUT_CLASS =
-  'rounded-xl border border-gold/30 bg-amber-bg/60 p-3.5 font-sans text-xs leading-relaxed text-navy shadow-2xs sm:p-4 sm:text-sm';
-const CHIP_CLASS =
-  'rounded-md border border-line bg-paper/60 px-2.5 py-1 text-xs font-semibold text-navy/70';
 
 function thresholdExplanation(analysis: SessionAnalysis): string {
   const { threshold, direction, target } = analysis;
@@ -35,7 +35,6 @@ function thresholdExplanation(analysis: SessionAnalysis): string {
   return parts.join(' ');
 }
 
-/** Full simulation result for one session run. */
 export function SessionResults({
   analysis,
   input,
@@ -48,88 +47,80 @@ export function SessionResults({
   const isConsent = outcome === 'consent';
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-line bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:p-6">
-        <div className="min-w-0 space-y-1.5">
-          <small className="block text-xs font-semibold tracking-wider text-navy/60 uppercase">
-            Simulation result
-          </small>
-          <h2 className="truncate font-display text-xl font-bold text-navy sm:text-2xl lg:text-3xl">
-            {input.title}
-          </h2>
-          <p className="font-sans text-xs text-navy/70 sm:text-sm">
-            {CATEGORY_LABELS[input.category]} · {rule.label} · {input.ask}
-          </p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <span className={CHIP_CLASS}>Committee: {input.committee || 'Not entered'}</span>
-            <span className={CHIP_CLASS}>Chair: {input.committeeChair || 'Chair not entered'}</span>
-            <span className={CHIP_CLASS}>
-              {voting.length} present · {notVoting} not voting
-            </span>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <Card className="flex flex-col items-stretch justify-between gap-5 sm:flex-row sm:items-center">
+          <div className="min-w-0 space-y-2">
+            <small className="block text-xs font-bold tracking-[0.14em] text-gold uppercase">
+              Simulation result
+            </small>
+            <h2 className="font-display text-xl leading-tight font-bold text-navy sm:text-2xl lg:text-[28px]">
+              {input.title}
+            </h2>
+            <p className="text-[13px] text-muted">
+              {CATEGORY_LABELS[input.category]} · {rule.label} · {input.ask}
+            </p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <Badge>Committee: {input.committee || 'Not entered'}</Badge>
+              <Badge>Chair: {input.committeeChair || 'Chair not entered'}</Badge>
+              <Badge>
+                {voting.length} present · {notVoting} not voting
+              </Badge>
+            </div>
           </div>
-        </div>
-        <ThresholdFigure analysis={analysis} />
-      </div>
+          <ThresholdFigure analysis={analysis} />
+        </Card>
 
-      <div className="space-y-3">
-        <div className={CALLOUT_CLASS}>
-          <strong className="mr-1.5 block font-semibold text-navy sm:inline">
-            {threshold.note}
-          </strong>
-          {thresholdExplanation(analysis)}
-        </div>
-        <div className={CALLOUT_CLASS}>
-          <strong className="mr-1.5 block font-semibold text-navy sm:inline">
-            {oneShot.title}
-          </strong>
-          {oneShot.body}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <Callout title={threshold.note}>{thresholdExplanation(analysis)}</Callout>
+          <Callout title={oneShot.title}>{oneShot.body}</Callout>
         </div>
       </div>
 
       {isConsent ? (
-        <>
-          <ConsentPanel objectors={analysis.consentObjectors} />
-          <SectionHeading
-            title="Member-by-member read"
-            note="Objector lens · select a row for evidence"
-          />
-        </>
+        <ConsentPanel objectors={analysis.consentObjectors} />
       ) : (
         <>
           <TallyPanel analysis={analysis} />
-          <SectionHeading title="Who is pivotal?" note="One-member threshold test" />
-          <PivotalPanel analysis={analysis} />
-          <SectionHeading
-            title="Member-by-member read"
-            note="Select a row for reasoning and sources"
-          />
+          <div className="space-y-4">
+            <SectionHeading title="Who is pivotal?" note="One-member threshold test" />
+            <PivotalPanel analysis={analysis} />
+          </div>
         </>
       )}
 
-      <div className="space-y-3">
-        {rows.map((row) => (
-          <MemberReadCard key={row.member.id} row={row} input={input} />
-        ))}
+      <div className="space-y-4">
+        <SectionHeading
+          title="Member-by-member read"
+          note={
+            isConsent
+              ? 'Objector lens · select a row for evidence'
+              : 'Select a row for reasoning and sources'
+          }
+        />
+        <div className="space-y-2.5">
+          {rows.map((row) => (
+            <MemberReadCard key={row.member.id} row={row} input={input} />
+          ))}
+        </div>
       </div>
 
       <OutreachList analysis={analysis} />
 
       {blocRow && (
-        <div className="rounded-xl border border-line bg-paper/50 p-3.5 font-sans text-xs leading-relaxed text-navy sm:p-4">
+        <div className="rounded-2xl border border-line bg-white p-5 text-[13px] leading-relaxed text-ink/80 shadow-card">
           <strong className="font-semibold text-navy">Bloc dynamic to watch:</strong>{' '}
           {blocRow.member.voting_bloc} <SourceList citations={citations(blocRow)} />
         </div>
       )}
 
-      <div className="flex justify-start pt-4">
-        <button
-          type="button"
-          onClick={() => downloadText('seventh-vote-brief.txt', textBrief(analysis, input))}
-          className="cursor-pointer rounded-xl border border-line bg-white px-6 py-2.5 font-display text-xs font-bold tracking-wider text-navy uppercase shadow-2xs transition-colors hover:bg-paper/60 focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none sm:text-sm"
-        >
-          Download text brief
-        </button>
-      </div>
+      <Button
+        variant="secondary"
+        onClick={() => downloadText('seventh-vote-brief.txt', textBrief(analysis, input))}
+      >
+        <DownloadIcon className="size-4" />
+        Download text brief
+      </Button>
     </div>
   );
 }

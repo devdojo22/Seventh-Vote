@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Disclaimer } from '@/components/Disclaimer';
-import { PageHeader } from '@/components/PageHeader';
+import { HeaderStat, PageHeader } from '@/components/PageHeader';
+import { CheckCircleIcon } from '@/components/ui/icons';
 import { STANCES } from '@/data/stances';
 import { analyzeSession } from '@/lib/simulation/analyze-session';
 import { findRule } from '@/lib/simulation/thresholds';
@@ -34,18 +34,12 @@ export function SessionPage() {
   }, [runId]);
 
   return (
-    <section className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+    <section className="space-y-8">
       <PageHeader
+        eyebrow="Council Session"
         title="Run a council session"
         description="Describe an agenda item. The engine scores each member against their sourced positions, triggers, and persuasion levers."
-        aside={
-          <div className="flex shrink-0 items-center gap-3 self-start rounded-xl border border-line bg-navy/5 px-4 py-2.5 sm:self-center">
-            <strong className="font-display text-2xl font-bold text-navy">{STANCES.length}</strong>
-            <span className="text-xs font-semibold tracking-wider text-navy/70 uppercase">
-              stance levels
-            </span>
-          </div>
-        }
+        aside={<HeaderStat value={STANCES.length} label="stance levels" />}
       />
 
       <SessionForm defaultValues={input ?? defaultSessionValues(members)} onRun={run} />
@@ -55,17 +49,16 @@ export function SessionPage() {
           <div
             role="status"
             aria-live="polite"
-            className="flex items-center gap-3 rounded-xl border border-pine/30 bg-pine-bg p-4 font-sans text-sm font-semibold text-pine shadow-2xs"
+            className="flex items-center gap-2.5 rounded-xl border border-pine/25 bg-pine-bg px-4 py-3 text-sm font-semibold text-pine"
           >
+            <CheckCircleIcon className="size-5 shrink-0" />
             Session complete — {analysis.rows.length} member reads generated below.
           </div>
-          <div ref={resultsRef} key={runId} className="space-y-6">
+          <div ref={resultsRef} key={runId} className="animate-fade-in scroll-mt-20">
             <SessionResults analysis={analysis} input={input} />
           </div>
         </>
       )}
-
-      <Disclaimer />
     </section>
   );
 }

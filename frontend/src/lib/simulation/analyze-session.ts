@@ -21,7 +21,6 @@ interface AnalyzeArgs {
   seatCount: number;
 }
 
-/** Everything a session result shows, computed once from the form input. */
 export function analyzeSession({ members, input, rule, seatCount }: AnalyzeArgs): SessionAnalysis {
   const rows = sortRows(members.map((m) => scoreMember(m, input)));
   const voting = votingRows(rows);

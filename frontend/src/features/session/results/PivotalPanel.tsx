@@ -1,4 +1,7 @@
-import { initials } from '@/lib/members';
+import { Avatar } from '@/components/ui/Avatar';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Meter } from '@/components/ui/Meter';
 import type { SessionAnalysis } from '@/types/simulation';
 
 function pivotalCopy(analysis: SessionAnalysis) {
@@ -39,7 +42,6 @@ function pivotalCopy(analysis: SessionAnalysis) {
   };
 }
 
-/** One-member threshold test: who could change the projected result. */
 export function PivotalPanel({ analysis }: { analysis: SessionAnalysis }) {
   const { pivot } = analysis;
   const { title, desc, goal } = pivotalCopy(analysis);
@@ -49,88 +51,77 @@ export function PivotalPanel({ analysis }: { analysis: SessionAnalysis }) {
       : 'Protect the projected coalition';
 
   return (
-    <div className="space-y-6 rounded-2xl border border-line bg-white p-4 shadow-sm sm:p-6">
-      <div className="flex flex-col items-start justify-between gap-4 rounded-xl border border-line bg-paper/40 p-4 sm:flex-row sm:items-center">
-        <div>
-          <span className="block text-xs font-semibold tracking-wider text-navy/60 uppercase">
+    <Card className="space-y-5">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
+          <span className="block text-xs font-bold tracking-[0.14em] text-gold uppercase">
             Pivotal-voter view
           </span>
-          <h3 className="mt-0.5 font-display text-lg font-bold text-navy sm:text-xl">{title}</h3>
-          <p className="mt-1 font-sans text-xs leading-relaxed text-navy/70 sm:text-sm">{desc}</p>
+          <h3 className="mt-1 font-display text-xl font-bold text-navy">{title}</h3>
+          <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-muted">{desc}</p>
         </div>
-        <div className="min-w-[130px] shrink-0 self-start rounded-xl border border-line bg-white px-4 py-2.5 text-center shadow-2xs sm:self-center">
-          <strong className="block font-display text-2xl font-bold text-navy">
+        <div className="shrink-0 rounded-2xl bg-paper px-5 py-3 text-center sm:min-w-[150px]">
+          <strong className="block font-display text-3xl leading-none font-bold text-navy">
             {pivot.candidates.length}
           </strong>
-          <span className="block text-[11px] leading-tight font-semibold tracking-wider text-navy/70 uppercase">
+          <span className="mt-1.5 block text-[11px] leading-tight font-semibold text-muted">
             single-member flips change result
           </span>
         </div>
       </div>
 
       {pivot.candidates.length > 0 ? (
-        <ul className="space-y-3">
+        <ol className="divide-y divide-line2 overflow-hidden rounded-xl border border-line">
           {pivot.candidates.map(({ row, priority }, i) => (
             <li
               key={row.member.id}
-              className="grid grid-cols-1 items-start gap-3 rounded-xl border border-line bg-paper/30 p-3.5 transition-all hover:bg-white sm:gap-4 sm:p-4 md:grid-cols-3 md:items-center"
+              className="grid grid-cols-1 items-center gap-3 p-4 transition-colors hover:bg-paper/60 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.2fr)] md:gap-5"
             >
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-navy font-display text-xs font-bold text-gold shadow-xs">
-                  {initials(row.member.name)}
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="w-4 shrink-0 text-right font-display text-sm font-bold text-muted/70">
+                  {i + 1}
                 </span>
+                <Avatar name={row.member.name} size="sm" />
                 <div className="min-w-0">
-                  <strong className="block truncate font-sans text-sm font-semibold text-navy">
-                    {i + 1}. {row.member.name}
+                  <strong className="block truncate text-sm font-semibold text-navy">
+                    {row.member.name}
                   </strong>
-                  <span className="block font-sans text-xs text-navy/60">
+                  <span className="block truncate text-xs text-muted">
                     {row.member.district} · {row.stance}
                   </span>
                 </div>
               </div>
 
               <div>
-                <div className="mb-1 flex items-center justify-between font-sans text-xs text-navy/70">
+                <div className="mb-1.5 flex items-center justify-between text-xs text-muted">
                   <span className="font-medium">Movability × pivotality</span>
                   <strong className="font-bold text-navy">{priority}</strong>
                 </div>
-                <div
-                  role="img"
-                  aria-label={`Priority score ${priority} out of 100`}
-                  className="h-2.5 w-full overflow-hidden rounded-full border border-line/60 bg-paper/80"
-                >
-                  <div
-                    className="h-full rounded-full bg-gold transition-all duration-300"
-                    style={{ width: `${priority}%` }}
-                  />
-                </div>
+                <Meter percent={priority} label={`Priority score ${priority} out of 100`} />
               </div>
 
-              <div className="space-y-0.5 rounded-lg border border-line/60 bg-white p-3 font-sans text-xs text-navy/80">
-                <strong className="block text-[11px] font-semibold tracking-wider text-navy uppercase">
+              <div className="rounded-xl bg-paper px-3.5 py-2.5 text-xs">
+                <strong className="block text-[11px] font-bold tracking-wide text-navy uppercase">
                   {action}
                 </strong>
-                <span className="block leading-tight text-navy/70">
+                <span className="mt-0.5 block leading-snug text-muted">
                   {row.levers[0] || 'Lead with a measurable public benefit.'}
                 </span>
               </div>
             </li>
           ))}
-        </ul>
+        </ol>
       ) : (
-        <div className="rounded-xl border border-line bg-paper/30 p-5 text-center font-sans text-xs leading-relaxed text-navy/70 sm:text-sm">
-          <strong className="mb-0.5 block font-semibold text-navy">
-            There is no marginal one-member meeting in this projection.
-          </strong>
+        <EmptyState title="There is no marginal one-member meeting in this projection.">
           Use the member reads below to build or defend a broader coalition.
-        </div>
+        </EmptyState>
       )}
 
-      <div className="border-t border-line pt-3 font-sans text-xs leading-relaxed text-navy/60 italic">
+      <p className="border-t border-line2 pt-4 text-xs leading-relaxed text-muted">
         Pivotality is 1 only when changing this member’s projected side alone crosses the {goal}.
         Movability is higher for undecided or leaning stances, thinner or lower-confidence records,
         and a cooperative mayor relationship; it is a prioritization aid, not a probability.
-      </div>
-    </div>
+      </p>
+    </Card>
   );
 }

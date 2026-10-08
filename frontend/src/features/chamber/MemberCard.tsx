@@ -1,6 +1,9 @@
+import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { ArrowUpRightIcon } from '@/components/ui/icons';
+import { Meter } from '@/components/ui/Meter';
 import {
   alignment,
-  initials,
   POSTURE_CLASSES,
   postureLabel,
   primaryRole,
@@ -9,13 +12,13 @@ import {
 } from '@/lib/members';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import type { Member, MemberId } from '@/types/member';
+import { YOUR_CALL_BADGE_CLASS } from './YourCallControl';
 
 interface MemberCardProps {
   member: Member;
   onOpen: (id: MemberId) => void;
 }
 
-/** One member card in the chamber grid. Opens the dossier drawer. */
 export function MemberCard({ member, onOpen }: MemberCardProps) {
   const depth = recordDepth(member);
   const posture = alignment(member);
@@ -24,55 +27,40 @@ export function MemberCard({ member, onOpen }: MemberCardProps) {
   return (
     <button
       type="button"
-      className="group relative flex min-w-0 cursor-pointer flex-col justify-between rounded-xl border border-line bg-white p-4.5 text-left transition-all hover:border-[#9fb0bd] hover:shadow-[0_7px_20px_rgba(13,36,56,0.08)]"
+      className="group relative flex min-w-0 cursor-pointer flex-col rounded-2xl border border-line bg-white p-5 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-navy/20 hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none"
       onClick={() => onOpen(member.id)}
     >
       <span
-        className="absolute top-4 right-4 text-sm font-bold text-[#8a9aa6] transition-colors group-hover:text-navy"
         aria-hidden="true"
+        className="absolute top-4 right-4 grid size-7 place-items-center rounded-full text-muted/70 transition-colors group-hover:bg-navy group-hover:text-gold"
       >
-        ↗
+        <ArrowUpRightIcon className="size-4" />
       </span>
-      <span className="block">
-        <span className="flex items-center gap-3 pr-5">
-          <span className="grid size-10.5 shrink-0 place-items-center rounded-full border-2 border-gold2 bg-navy2 font-display text-[17px] text-white">
-            {initials(member.name)}
+
+      <span className="flex items-center gap-3 pr-8">
+        <Avatar name={member.name} />
+        <span className="min-w-0">
+          <span className="block truncate font-display text-lg leading-tight font-bold text-navy">
+            {member.name}
           </span>
-          <span className="min-w-0">
-            <span className="mb-0.5 block truncate font-display text-[19px] leading-tight font-semibold text-navy sm:text-[20px]">
-              {member.name}
-            </span>
-            <span className="block truncate text-[12px] text-muted">
-              {member.district} · Since {sinceYear(member.took_office)}
-            </span>
+          <span className="mt-0.5 block truncate text-xs text-muted">
+            {member.district} · Since {sinceYear(member.took_office)}
           </span>
-        </span>
-        <span className="my-3.5 line-clamp-2 block min-h-[42px] text-[13px] leading-relaxed text-[#405565]">
-          {primaryRole(member)}
         </span>
       </span>
-      <span className="block">
-        <span className="flex flex-wrap items-center gap-1.5">
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${POSTURE_CLASSES[posture]}`}
-          >
-            {postureLabel(posture)} posture
-          </span>
-          {yourCall && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#d9b96a] bg-amber-bg px-2.5 py-1 text-[11px] font-bold text-[#775218]">
-              Your call: {yourCall}
-            </span>
-          )}
-        </span>
-        <span className="mt-3.5 flex items-center gap-2 text-[11px] text-muted">
-          <span className="shrink-0">{depth.label} record</span>
-          <span className="block h-1 flex-1 overflow-hidden rounded-full bg-[#e4e9ec]">
-            <span
-              className="block h-full bg-gold transition-all duration-300"
-              style={{ width: `${depth.percent}%` }}
-            />
-          </span>
-        </span>
+
+      <span className="my-4 line-clamp-2 min-h-[2.75rem] text-[13px] leading-relaxed text-ink/75">
+        {primaryRole(member)}
+      </span>
+
+      <span className="mt-auto flex flex-wrap items-center gap-1.5">
+        <Badge className={POSTURE_CLASSES[posture]}>{postureLabel(posture)} posture</Badge>
+        {yourCall && <Badge className={YOUR_CALL_BADGE_CLASS}>Your call: {yourCall}</Badge>}
+      </span>
+
+      <span className="mt-4 flex items-center gap-3 border-t border-line2 pt-3.5 text-[11px] font-medium text-muted">
+        <span className="shrink-0">{depth.label} record</span>
+        <Meter percent={depth.percent} className="flex-1" />
       </span>
     </button>
   );

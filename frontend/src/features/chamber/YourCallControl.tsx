@@ -4,6 +4,11 @@ import type { Member } from '@/types/member';
 
 const STANCE_LABELS = STANCES.map((s) => s.label).reverse();
 
+const OPTION_CLASS =
+  'cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none';
+
+export const YOUR_CALL_BADGE_CLASS = 'border border-dashed border-gold/60 bg-amber-bg text-amber';
+
 export function YourCallControl({ member }: { member: Member }) {
   const current = useWorkspaceStore((s) => s.calls[member.id]);
   const setCall = useWorkspaceStore((s) => s.setCall);
@@ -14,17 +19,17 @@ export function YourCallControl({ member }: { member: Member }) {
         Your own read on {member.name.split(' ')[0]}&rsquo;s stance — kept only in this tab&rsquo;s
         memory. Never saved, never sent anywhere.
       </p>
-      <div className="flex flex-wrap gap-2 pt-1">
+      <div className="flex flex-wrap gap-2">
         {STANCE_LABELS.map((label) => (
           <button
             key={label}
             type="button"
             onClick={() => setCall(member.id, current === label ? null : label)}
             aria-pressed={current === label}
-            className={`cursor-pointer rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors ${
+            className={`${OPTION_CLASS} ${
               current === label
-                ? 'border-navy bg-navy text-white shadow-xs'
-                : 'border-line bg-white text-ink hover:border-steel'
+                ? 'border-navy bg-navy text-white shadow-card'
+                : 'border-line bg-white text-ink hover:border-navy/30 hover:bg-paper'
             }`}
           >
             {label}
@@ -34,7 +39,7 @@ export function YourCallControl({ member }: { member: Member }) {
           <button
             type="button"
             onClick={() => setCall(member.id, null)}
-            className="cursor-pointer rounded-full border border-line bg-white px-3 py-1.5 text-[12px] font-bold text-muted hover:text-ink"
+            className={`${OPTION_CLASS} border-transparent text-muted hover:text-ink`}
           >
             Clear
           </button>

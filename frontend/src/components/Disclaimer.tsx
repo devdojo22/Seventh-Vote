@@ -1,9 +1,10 @@
-/** The "Rehearsal, not prediction." footer shown under every view. */
 export function Disclaimer() {
   return (
-    <footer className="mt-10 pt-4.5 pb-8 border-t border-line text-[#657785] text-[11px] flex flex-col sm:flex-row gap-1.5 sm:gap-3 items-start">
-      <strong className="text-navy font-bold whitespace-nowrap">Rehearsal, not prediction.</strong>
-      <span className="leading-normal">
+    <footer className="mt-14 flex flex-col items-start gap-1.5 border-t border-line pt-5 text-xs leading-relaxed text-muted sm:flex-row sm:gap-3">
+      <strong className="font-semibold whitespace-nowrap text-navy">
+        Rehearsal, not prediction.
+      </strong>
+      <span>
         Digital-twin outputs are public-record hypotheses for preparation. Verify citations, account
         for missing context, and speak with council members directly before making decisions.
       </span>

@@ -1,6 +1,6 @@
 import { Navigate, type RouteObject } from 'react-router';
 import { ChamberPage } from '@/features/chamber/ChamberPage';
-import { MethodPage } from '@/features/methodology/MethodPage';
+import { MethodologyPage } from '@/features/methodology/MethodologyPage';
 import { PrepPage } from '@/features/prep/PrepPage';
 import { SessionPage } from '@/features/session/SessionPage';
 import { AppLayout } from './layout/AppLayout';
@@ -12,7 +12,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <ChamberPage /> },
       { path: 'session', element: <SessionPage /> },
       { path: 'prep', element: <PrepPage /> },
-      { path: 'method', element: <MethodPage /> },
+      { path: 'method', element: <MethodologyPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

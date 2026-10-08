@@ -15,7 +15,7 @@ export function SourceLink({ name, url, label }: SourceLinkProps) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[#245f87] underline underline-offset-[3px] transition-colors hover:text-[#153e5b] wrap-break-word"
+        className="font-medium text-steel underline decoration-steel/30 underline-offset-[3px] transition-colors wrap-break-word hover:text-navy hover:decoration-navy/50"
       >
         {text}
       </a>

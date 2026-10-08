@@ -11,7 +11,6 @@ import type { StanceLabel } from '@/types/simulation';
  */
 interface WorkspaceState {
   calls: Partial<Record<MemberId, StanceLabel>>;
-  /** Set the private read for one member, or clear it with null. */
   setCall: (memberId: MemberId, stance: StanceLabel | null) => void;
   clearCalls: () => void;
 }

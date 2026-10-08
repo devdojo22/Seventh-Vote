@@ -1,36 +1,36 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { SourceLink } from '@/components/SourceLink';
+import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { BulletList } from '@/components/ui/BulletList';
+import { Callout } from '@/components/ui/Callout';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { CloseIcon, LockIcon } from '@/components/ui/icons';
 import { CATEGORY_LABELS } from '@/data/agenda';
-import {
-  alignment,
-  fieldText,
-  initials,
-  POSTURE_CLASSES,
-  postureLabel,
-  recordDepth,
-} from '@/lib/members';
+import { alignment, fieldText, POSTURE_CLASSES, postureLabel, recordDepth } from '@/lib/members';
 import { isHttpUrl } from '@/lib/url';
 import { useAppStore } from '@/stores/app-store';
 import { useCouncilStore } from '@/stores/council-store';
 import type { CategoryId } from '@/types/simulation';
 import { YourCallControl } from './YourCallControl';
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <section className="space-y-2.5 border-t border-line pt-2">
-      <h3 className="font-display text-[18px] font-semibold text-navy sm:text-[21px]">{title}</h3>
+    <section className="space-y-3">
+      <h3 className="flex items-center gap-2 font-display text-lg font-bold text-navy">
+        {icon}
+        {title}
+      </h3>
       {children}
     </section>
-  );
-}
-
-function BulletList({ items }: { items: string[] }) {
-  return (
-    <ul className="list-disc space-y-1 pl-5">
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
   );
 }
 
@@ -38,7 +38,6 @@ function issueLabel(key: string): string {
   return key in CATEGORY_LABELS ? CATEGORY_LABELS[key as CategoryId] : key.replace(/_/g, ' ');
 }
 
-/** Full dossier drawer for the member selected in the app store. */
 export function MemberDrawer() {
   const memberId = useAppStore((s) => s.openMemberId);
   const closeMember = useAppStore((s) => s.closeMember);
@@ -72,7 +71,7 @@ export function MemberDrawer() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in justify-end bg-[#04101a]/55 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex animate-fade-in justify-end bg-navy/50 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="drawer-name"
@@ -80,139 +79,157 @@ export function MemberDrawer() {
         if (e.target === e.currentTarget) closeMember();
       }}
     >
-      <div className="flex h-full w-full max-w-[690px] animate-slide-in-right flex-col overflow-y-auto bg-white shadow-2xl">
-        <div className="sticky top-0 z-20 flex shrink-0 items-center gap-3.5 border-b-4 border-gold bg-navy p-4.5 text-white sm:p-6">
-          <span className="grid size-11 shrink-0 place-items-center rounded-full border-2 border-gold2 bg-white font-display text-[18px] font-bold text-navy">
-            {initials(member.name)}
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2
-              id="drawer-name"
-              className="truncate font-display text-[22px] leading-tight font-semibold sm:text-[28px]"
+      <div className="flex h-full w-full max-w-[720px] animate-slide-in-right flex-col overflow-y-auto bg-paper shadow-elevated">
+        <div className="sticky top-0 z-20 shrink-0 bg-navy text-white shadow-[0_1px_0_rgb(200_155_60/0.55)]">
+          <div className="flex items-center gap-4 p-5 sm:px-7 sm:py-6">
+            <Avatar name={member.name} size="lg" inverted />
+            <div className="min-w-0 flex-1">
+              <h2
+                id="drawer-name"
+                className="truncate font-display text-2xl leading-tight font-bold sm:text-[28px]"
+              >
+                {member.name}
+              </h2>
+              <p className="mt-0.5 truncate text-[13px] text-white/65">
+                {member.district} · {member.leadership_role}
+              </p>
+            </div>
+            <button
+              ref={closeRef}
+              type="button"
+              className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border border-white/20 text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none"
+              aria-label="Close dossier"
+              onClick={closeMember}
             >
-              {member.name}
-            </h2>
-            <p className="mt-0.5 truncate text-[12px] text-[#c8d5de]">
-              {member.district} · {member.leadership_role}
-            </p>
+              <CloseIcon className="size-4.5" />
+            </button>
           </div>
-          <button
-            ref={closeRef}
-            type="button"
-            className="ml-auto flex size-8.5 cursor-pointer items-center justify-center rounded-full border border-white/35 bg-transparent text-xl text-white transition-colors hover:bg-white/10"
-            aria-label="Close dossier"
-            onClick={closeMember}
-          >
-            ×
-          </button>
         </div>
 
-        <div className="flex-1 space-y-6 p-4.5 pb-16 text-[13px] text-[#405565] sm:p-7">
+        <div className="flex-1 space-y-4 p-4 pb-16 text-[13px] leading-relaxed text-ink/80 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${POSTURE_CLASSES[posture]}`}
-            >
+            <Badge className={POSTURE_CLASSES[posture]}>
               {postureLabel(posture)} mayor posture
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#edf2f4] px-2.5 py-1 text-[11px] font-bold text-[#405565]">
-              {depth.label} record depth
-            </span>
+            </Badge>
+            <Badge>{depth.label} record depth</Badge>
           </div>
 
-          <Section title="Your call · private">
-            <YourCallControl member={member} />
-          </Section>
+          <div className="space-y-6 rounded-2xl border border-line bg-white p-5 shadow-card sm:p-6">
+            <Section title="Your call · private" icon={<LockIcon className="size-4 text-gold" />}>
+              <YourCallControl member={member} />
+            </Section>
+          </div>
 
-          <Section title="Profile">
-            <p className="leading-relaxed">{member.bio}</p>
-            <p className="leading-relaxed">
-              <strong className="font-semibold text-navy">Political style:</strong>{' '}
-              {fieldText(member.political_style)}
-            </p>
-          </Section>
+          <div className="divide-y divide-line2 rounded-2xl border border-line bg-white shadow-card *:p-5 sm:*:p-6">
+            <Section title="Profile">
+              <p>{member.bio}</p>
+              <p>
+                <strong className="font-semibold text-navy">Political style:</strong>{' '}
+                {fieldText(member.political_style)}
+              </p>
+            </Section>
 
-          <Section title="Committees & leadership">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {Object.entries(member.committees).map(([committee, role]) => (
-                <div className="rounded-lg bg-[#f3f6f7] p-2.5 text-[12px]" key={committee}>
-                  <strong className="mb-0.5 block font-semibold text-navy">{committee}</strong>
-                  <span>{role}</span>
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="Issue positions">
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {positions.map(([key, p]) => (
-                <div className="space-y-1.5 rounded-lg border border-line bg-white p-3" key={key}>
-                  <h4 className="text-[13px] font-semibold text-navy capitalize">
-                    {issueLabel(key)}
-                  </h4>
-                  <p className="text-[12px]">
-                    <strong className="font-semibold text-navy">Stance:</strong> {p.stance}
-                  </p>
-                  <p className="text-[12px] leading-relaxed">{p.evidence}</p>
-                  <SourceLink name={p.source_name} url={p.source_url} label="Source" />
-                </div>
-              ))}
-              {positions.length === 0 && <p className="text-muted">No sourced positions found.</p>}
-            </div>
-          </Section>
-
-          <Section title="Key record">
-            <div className="divide-y divide-line2">
-              {member.key_votes.map((v) => (
-                <div className="space-y-1 py-3 first:pt-0 last:pb-0" key={v.id}>
-                  <h4 className="text-[13px] font-semibold text-ink">{v.item}</h4>
-                  <div className="text-[11px] text-muted">
-                    {v.date} · {v.position}
-                  </div>
-                  <SourceLink name={v.source_name} url={v.source_url} label="View source" />
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="Voice evidence">
-            <p className="leading-relaxed">{fieldText(member.twin_voice)}</p>
-            {quotes.length > 0 ? (
-              <div className="space-y-3 pt-1">
-                {quotes.map((q) => (
-                  <div className="space-y-1" key={q.id}>
-                    <p className="border-l-3 border-gold py-0.5 pl-3 font-display text-[16px] leading-snug text-navy italic sm:text-[18px]">
-                      &ldquo;{q.quote}&rdquo;
-                    </p>
-                    <div className="pl-3">
-                      <SourceLink name={q.source_name} url={q.source_url} label="Source" />
-                    </div>
+            <Section title="Committees & leadership">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {Object.entries(member.committees).map(([committee, role]) => (
+                  <div className="rounded-xl bg-paper px-3.5 py-3 text-xs" key={committee}>
+                    <strong className="mb-0.5 block font-semibold text-navy">{committee}</strong>
+                    <span className="text-muted">{role}</span>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-muted">No verified direct quote available.</p>
-            )}
-          </Section>
+            </Section>
 
-          <Section title="Decision pattern">
-            <p>
-              <strong className="font-semibold text-navy">Voting bloc:</strong> {member.voting_bloc}
-            </p>
-            <div className="space-y-1">
-              <strong className="block font-semibold text-navy">Opposition triggers</strong>
-              <BulletList items={member.opposition_triggers} />
-            </div>
-            <div className="space-y-1 pt-1">
-              <strong className="block font-semibold text-navy">Persuasion levers</strong>
-              <BulletList items={member.persuasion_levers} />
-            </div>
-          </Section>
+            <Section title="Issue positions">
+              {positions.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {positions.map(([key, p]) => (
+                    <div className="space-y-1.5 rounded-xl border border-line p-3.5" key={key}>
+                      <h4 className="text-[13px] font-semibold text-navy capitalize">
+                        {issueLabel(key)}
+                      </h4>
+                      <p className="text-xs">
+                        <strong className="font-semibold text-navy">Stance:</strong> {p.stance}
+                      </p>
+                      <p className="text-xs">{p.evidence}</p>
+                      <p className="text-xs">
+                        <SourceLink name={p.source_name} url={p.source_url} label="Source" />
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState>No sourced positions found.</EmptyState>
+              )}
+            </Section>
 
-          <Section title="Data gaps">
-            <div className="rounded-lg border border-[#ead5a7] bg-amber-bg p-3 text-[12px] text-[#775218]">
-              <BulletList items={member.data_gaps} />
-            </div>
-          </Section>
+            <Section title="Key record">
+              <ol className="relative space-y-4 border-l border-line pl-5">
+                {member.key_votes.map((v) => (
+                  <li className="relative space-y-1" key={v.id}>
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-1.5 -left-[23.5px] size-2 rounded-full bg-gold ring-4 ring-white"
+                    />
+                    <h4 className="text-[13px] font-semibold text-ink">{v.item}</h4>
+                    <div className="text-[11px] font-medium text-muted">
+                      {v.date} · {v.position}
+                    </div>
+                    <div className="text-xs">
+                      <SourceLink name={v.source_name} url={v.source_url} label="View source" />
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </Section>
+
+            <Section title="Voice evidence">
+              <p>{fieldText(member.twin_voice)}</p>
+              {quotes.length > 0 ? (
+                <div className="space-y-3">
+                  {quotes.map((q) => (
+                    <figure className="rounded-xl bg-paper p-4" key={q.id}>
+                      <blockquote className="border-l-2 border-gold pl-3.5 font-display text-base leading-snug text-navy italic sm:text-[17px]">
+                        &ldquo;{q.quote}&rdquo;
+                      </blockquote>
+                      <figcaption className="mt-2 pl-4 text-xs">
+                        <SourceLink name={q.source_name} url={q.source_url} label="Source" />
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState>No verified direct quote available.</EmptyState>
+              )}
+            </Section>
+
+            <Section title="Decision pattern">
+              <p>
+                <strong className="font-semibold text-navy">Voting bloc:</strong>{' '}
+                {member.voting_bloc}
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-2 rounded-xl bg-brick-bg/60 p-4">
+                  <strong className="block text-xs font-bold tracking-wide text-brick uppercase">
+                    Opposition triggers
+                  </strong>
+                  <BulletList items={member.opposition_triggers} />
+                </div>
+                <div className="space-y-2 rounded-xl bg-pine-bg/70 p-4">
+                  <strong className="block text-xs font-bold tracking-wide text-pine uppercase">
+                    Persuasion levers
+                  </strong>
+                  <BulletList items={member.persuasion_levers} />
+                </div>
+              </div>
+            </Section>
+
+            <Section title="Data gaps">
+              <Callout>
+                <BulletList items={member.data_gaps} />
+              </Callout>
+            </Section>
+          </div>
         </div>
       </div>
     </div>

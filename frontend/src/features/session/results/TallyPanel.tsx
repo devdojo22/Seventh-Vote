@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/Card';
 import type { SessionAnalysis } from '@/types/simulation';
 
 const COPY = {
@@ -32,56 +33,53 @@ function outcomeText(analysis: SessionAnalysis): string {
   return `${gap} · ${breakdown.solid} ${copy.solid} · ${breakdown.persuadable} persuadable · ${breakdown.counter} ${copy.counter}`;
 }
 
-/** Stance tally bar, legend and the pass/fail outcome line. */
 export function TallyPanel({ analysis }: { analysis: SessionAnalysis }) {
   const { tally, outcome, direction } = analysis;
   const copy = COPY[direction];
   const summary = tally.map((s) => `${s.count} ${s.label}`).join(', ');
 
   return (
-    <div className="space-y-4 rounded-2xl border border-line bg-white p-4 shadow-sm sm:p-6">
-      <div
-        role="img"
-        aria-label={`Stance tally: ${summary}`}
-        className="flex h-6 w-full gap-0.5 overflow-hidden rounded-xl border border-line bg-paper/60 p-0.5"
-      >
-        {tally.map((s) => (
-          <span
-            key={s.key}
-            className={`${s.barClass} h-full rounded-xs transition-all duration-300`}
-            style={{ width: `${s.widthPct}%` }}
-          />
-        ))}
-      </div>
-
-      <ul className="grid grid-cols-2 gap-2 font-sans text-xs sm:grid-cols-3 md:grid-cols-6">
-        {tally.map((s) => (
-          <li
-            key={s.key}
-            className="flex items-center gap-2 rounded-lg border border-line/60 bg-paper/30 p-2"
-          >
-            <b className="font-display text-sm font-bold text-navy">{s.count}</b>
-            <span className="leading-tight text-navy/70">{s.label}</span>
-          </li>
-        ))}
-      </ul>
-
-      <div className="flex flex-col items-start justify-between gap-2 border-t border-line pt-3 font-sans text-xs sm:flex-row sm:items-center sm:text-sm">
+    <Card className="space-y-5">
+      <div className="flex flex-col items-start justify-between gap-1.5 sm:flex-row sm:items-baseline">
         {outcome === 'unreachable' ? (
-          <strong className="font-display text-base font-bold text-brick sm:text-lg">
+          <strong className="font-display text-lg font-bold text-brick sm:text-xl">
             No members present: nothing can be voted on
           </strong>
         ) : (
           <>
             <strong
-              className={`font-display text-base font-bold sm:text-lg ${outcome === 'met' ? 'text-pine' : 'text-brick'}`}
+              className={`font-display text-lg font-bold sm:text-xl ${outcome === 'met' ? 'text-pine' : 'text-brick'}`}
             >
               {outcome === 'met' ? copy.met : copy.short}
             </strong>
-            <span className="font-medium text-navy/70">{outcomeText(analysis)}</span>
+            <span className="text-[13px] font-medium text-muted">{outcomeText(analysis)}</span>
           </>
         )}
       </div>
-    </div>
+
+      <div
+        role="img"
+        aria-label={`Stance tally: ${summary}`}
+        className="flex h-4 w-full gap-0.5 overflow-hidden rounded-full bg-line2"
+      >
+        {tally.map((s) => (
+          <span
+            key={s.key}
+            className={`${s.barClass} h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full`}
+            style={{ width: `${s.widthPct}%` }}
+          />
+        ))}
+      </div>
+
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {tally.map((s) => (
+          <li key={s.key} className="flex items-center gap-2.5 rounded-xl bg-paper px-3 py-2.5">
+            <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-full ${s.barClass}`} />
+            <b className="font-display text-base leading-none font-bold text-navy">{s.count}</b>
+            <span className="text-xs leading-tight text-muted">{s.label}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
