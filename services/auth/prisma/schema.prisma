@@ -1,3 +1,10 @@
+// Auth service data model. Owns the "auth" schema only; the Django API owns "app".
+// Conventions:
+//   - UUID primary keys, snake_case column and table names via @map / @@map.
+//   - Every timestamp is timestamptz(6) so values are unambiguous across hosts.
+//   - Mutable tables carry created_at + updated_at; append-only tables carry created_at.
+//   - Every foreign key column is indexed. Cross-schema links (to "app") are by id only.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,71 +14,127 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Role a user holds inside one workspace.
 enum Role {
   CAO
   STAFF
 }
 
+/// A login identity. One user can belong to many workspaces via Membership.
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  mfaSecret    String?  @map("mfa_secret")
-  mfaEnabled   Boolean  @default(false) @map("mfa_enabled")
-  isSuperAdmin Boolean  @default(false) @map("is_super_admin")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id                String    @id @default(uuid()) @db.Uuid
+  email             String    @unique
+  name              String?
+  passwordHash      String    @map("password_hash")
+  /// AES-256-GCM ciphertext (lib/crypto.js); never returned by the API.
+  mfaSecret         String?   @map("mfa_secret")
+  /// New secret awaiting its first valid code (enrolment or re-enrolment).
+  mfaPendingSecret  String?   @map("mfa_pending_secret")
+  mfaEnabled        Boolean   @default(false) @map("mfa_enabled")
+  /// Last accepted TOTP time step; codes at or before it are replays.
+  mfaLastStep       Int?      @map("mfa_last_step")
+  isSuperAdmin      Boolean   @default(false) @map("is_super_admin")
+  /// Access tokens issued before this instant are rejected.
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships   Membership[]
-  refreshTokens RefreshToken[]
+  memberships         Membership[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]
 
   @@map("users")
 }
 
+/// A tenant. All "app" schema rows are scoped by workspace_id.
 model Workspace {
-  id          String       @id @default(uuid()) @db.Uuid
-  name        String
-  slug        String       @unique
-  createdAt   DateTime     @default(now()) @map("created_at")
-  memberships Membership[]
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
 
   @@map("workspaces")
 }
 
+/// Links a user to a workspace with a role. One row per (user, workspace).
 model Membership {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  workspaceId String    @map("workspace_id") @db.Uuid
-  role        Role      @default(STAFF)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  role        Role     @default(STAFF)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
+  @@index([workspaceId])
   @@map("memberships")
 }
 
+/// Hashed refresh token (sha256). Rotated on every use; revoked_at marks the old one.
 model RefreshToken {
   id          String    @id @default(uuid()) @db.Uuid
   userId      String    @map("user_id") @db.Uuid
+  /// Active workspace for the session; null until one is selected.
   workspaceId String?   @map("workspace_id") @db.Uuid
   tokenHash   String    @unique @map("token_hash")
-  expiresAt   DateTime  @map("expires_at")
-  revokedAt   DateTime? @map("revoked_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([workspaceId])
+  /// For the expired-token sweep.
+  @@index([expiresAt])
   @@map("refresh_tokens")
 }
 
+/// Hashed single-use password reset token.
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  /// For the expired-token sweep.
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+/// Append-only security log. Rows outlive the user/workspace they refer to (SetNull).
+/// Must never contain the private "Your call" overlay or any secret.
 model AuditLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @map("user_id") @db.Uuid
-  action    String
-  ip        String?
-  meta      Json?
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  workspaceId String?  @map("workspace_id") @db.Uuid
+  /// Dotted event name, e.g. "auth.login", "auth.mfa_failed".
+  action      String
+  ip          String?
+  meta        Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+  @@index([userId])
+  @@index([action])
+  @@index([workspaceId, createdAt])
   @@map("audit_log")
 }
