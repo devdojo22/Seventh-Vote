@@ -1,8 +1,11 @@
-import { Link } from 'react-router';
+import { Link, NavLink } from 'react-router';
+import { Avatar } from '@/components/ui/Avatar';
 import { useCouncilStore } from '@/stores/council-store';
+import { useProfileStore } from '@/stores/profile-store';
 
 export function TopBar() {
   const snapshotLabel = useCouncilStore((s) => s.config.snapshotLabel);
+  const userName = useProfileStore((s) => s.user.name);
   return (
     <header className="sticky top-0 z-30 h-14 bg-navy text-white shadow-[0_1px_0_rgb(200_155_60/0.55)]">
       <div className="mx-auto flex h-full max-w-[1380px] items-center gap-3 px-4 sm:gap-5 sm:px-6 lg:px-8">
@@ -26,6 +29,20 @@ export function TopBar() {
           <span aria-hidden="true" className="size-1.5 rounded-full bg-gold" />
           {snapshotLabel}
         </span>
+        <NavLink
+          to="/profile"
+          aria-label="My profile"
+          className={({ isActive }) =>
+            `flex shrink-0 items-center gap-2.5 rounded-full p-0.5 transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none sm:pr-3 ${
+              isActive ? 'bg-white/10' : ''
+            }`
+          }
+        >
+          <Avatar name={userName} size="sm" inverted />
+          <span className="hidden max-w-36 truncate text-[13px] font-semibold sm:inline">
+            {userName}
+          </span>
+        </NavLink>
       </div>
     </header>
   );
