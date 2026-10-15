@@ -4,6 +4,7 @@ import {
   ChamberIcon,
   MethodIcon,
   PrepIcon,
+  ShieldIcon,
   SessionIcon,
   type IconProps,
 } from '@/components/ui/icons';
@@ -21,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/session', label: 'Council Session', short: 'Session', Icon: SessionIcon },
   { to: '/prep', label: '1-on-1 Prep', short: '1-on-1', Icon: PrepIcon },
   { to: '/method', label: 'Methodology', short: 'Method', Icon: MethodIcon },
+  { to: '/access', label: 'Access Control', short: 'Access', Icon: ShieldIcon },
 ];
 
 export function Sidebar() {
@@ -76,7 +78,7 @@ export function Sidebar() {
 export function MobileNav() {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 gap-1 border-t border-line bg-white/95 px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgb(13_36_56/0.08)] backdrop-blur-md lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 gap-1 border-t border-line bg-white/95 px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgb(13_36_56/0.08)] backdrop-blur-md lg:hidden"
       aria-label="Mobile primary"
     >
       {NAV_ITEMS.map(({ to, short, Icon }) => (
