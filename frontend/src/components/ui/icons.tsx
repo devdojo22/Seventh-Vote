@@ -53,6 +53,25 @@ export const ArrowUpRightIcon = ({ className }: IconProps) => (
   </Icon>
 );
 
+export const ArrowLeftIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M19 12H5m0 0 6 6m-6-6 6-6" />
+  </Icon>
+);
+
+export const SearchIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </Icon>
+);
+
+export const PlusIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+
 export const ChevronDownIcon = ({ className }: IconProps) => (
   <Icon className={className}>
     <path d="m6 9 6 6 6-6" />
@@ -89,5 +108,47 @@ export const LockIcon = ({ className }: IconProps) => (
   <Icon className={className}>
     <rect x="4" y="11" width="16" height="10" rx="2" />
     <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </Icon>
+);
+
+export const MailIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </Icon>
+);
+
+export const UserIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21a8 8 0 0 1 16 0" />
+  </Icon>
+);
+
+export const EyeIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+
+export const EyeOffIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.2 3.2M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+  </Icon>
+);
+
+export const SourceDocIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+    <path d="M14 3v5h5M9 13h6M9 17h4" />
+  </Icon>
+);
+
+export const ShieldIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M12 21s-8-3.5-8-10V5l8-3 8 3v6c0 6.5-8 10-8 10Z" />
+    <path d="m9 11.5 2 2 4-4" />
   </Icon>
 );
