@@ -19,7 +19,10 @@ services:
       retries: 10
 
   auth:
-    build: ./services/auth
+    build:
+      context: ./services/auth
+      # Hot-reloading dev image. Production deploys build the default `production` target.
+      target: dev
     env_file: .env
     environment:
       # Prisma owns the "auth" schema only.
