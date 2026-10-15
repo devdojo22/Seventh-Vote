@@ -26,7 +26,7 @@ model User {
   email             String    @unique
   name              String?
   passwordHash      String    @map("password_hash")
-  /// AES-256-GCM ciphertext (lib/crypto.js); never returned by the API.
+  /// AES-256-GCM ciphertext (src/modules/mfa/mfa-secret.cipher.ts); never returned by the API.
   mfaSecret         String?   @map("mfa_secret")
   /// New secret awaiting its first valid code (enrolment or re-enrolment).
   mfaPendingSecret  String?   @map("mfa_pending_secret")

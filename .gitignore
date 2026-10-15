@@ -1,6 +1,7 @@
 .env
 node_modules/
 dist/
+.legacy-dist/
 __pycache__/
 *.pyc
 .pytest_cache/
