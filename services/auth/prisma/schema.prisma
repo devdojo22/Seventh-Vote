@@ -1,9 +1,4 @@
 // Auth service data model. Owns the "auth" schema only; the Django API owns "app".
-// Conventions:
-//   - UUID primary keys, snake_case column and table names via @map / @@map.
-//   - Every timestamp is timestamptz(6) so values are unambiguous across hosts.
-//   - Mutable tables carry created_at + updated_at; append-only tables carry created_at.
-//   - Every foreign key column is indexed. Cross-schema links (to "app") are by id only.
 
 generator client {
   provider = "prisma-client-js"
@@ -14,62 +9,83 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Role a user holds inside one workspace.
+/// Role a user holds inside one workspace. Real-world titles (CAO, COO, City Manager, ...) never decide it.
+/// PRINCIPAL: the workspace's single accountable owner, designated or transferred only by a super-admin.
+/// AFFILIATE: granted access by the Principal; views dossiers, runs rehearsals and views results.
 enum Role {
-  CAO
-  STAFF
+  PRINCIPAL
+  AFFILIATE
 }
 
 /// A login identity. One user can belong to many workspaces via Membership.
 model User {
   id                String    @id @default(uuid()) @db.Uuid
   email             String    @unique
+  /// Combined display name of accounts created before first and last names were collected separately.
   name              String?
+  firstName         String?   @map("first_name")
+  lastName          String?   @map("last_name")
   passwordHash      String    @map("password_hash")
-  /// AES-256-GCM ciphertext (src/modules/mfa/mfa-secret.cipher.ts); never returned by the API.
-  mfaSecret         String?   @map("mfa_secret")
-  /// New secret awaiting its first valid code (enrolment or re-enrolment).
-  mfaPendingSecret  String?   @map("mfa_pending_secret")
-  mfaEnabled        Boolean   @default(false) @map("mfa_enabled")
-  /// Last accepted TOTP time step; codes at or before it are replays.
-  mfaLastStep       Int?      @map("mfa_last_step")
+  /// First time the user entered a code emailed to `email`; null until then.
+  emailVerifiedAt   DateTime? @map("email_verified_at") @db.Timestamptz(6)
   isSuperAdmin      Boolean   @default(false) @map("is_super_admin")
-  /// Access tokens issued before this instant are rejected.
+  /// True only for accounts created by the retired public self-registration. Historical marker: nothing
+  /// reads it at runtime any more (migration 0009 used it to demote self-registered Principals).
+  selfRegistered    Boolean   @default(false) @map("self_registered")
+  /// When the password last changed (informational; token freshness uses `securityVersion`).
   passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
+  /// Incremented in the same transaction as every password change or reset. Access tokens, sign-in code
+  /// tokens and refresh sessions carry the version they were issued under and stop working once it moves.
+  securityVersion   Int       @default(0) @map("security_version")
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   memberships         Membership[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  emailOtpChallenges  EmailOtpChallenge[]
   auditLogs           AuditLog[]
+  invitationsSent     Invitation[]         @relation("InvitationsSent")
 
   @@map("users")
 }
 
 /// A tenant. All "app" schema rows are scoped by workspace_id.
+/// Vote rules are set by the workspace's Principal; all three are NULL until configured, and a CHECK
+/// constraint (migration 0010) keeps them all-or-nothing and within the body size.
 model Workspace {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                    String   @id @default(uuid()) @db.Uuid
+  name                  String
+  slug                  String   @unique
+  /// Number of voting seats.
+  voteBodySize          Int?     @map("vote_body_size")
+  /// Votes needed for an ordinary item to pass.
+  voteMajorityThreshold Int?     @map("vote_majority_threshold")
+  /// Members who must be present for business.
+  voteQuorum            Int?     @map("vote_quorum")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   memberships   Membership[]
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
+  invitations   Invitation[]
 
   @@map("workspaces")
 }
 
 /// Links a user to a workspace with a role. One row per (user, workspace).
+/// At most one PRINCIPAL per workspace: enforced by the partial unique index
+/// "memberships_one_principal_per_workspace" (migration 0009, raw SQL; Prisma cannot express it).
 model Membership {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  workspaceId String   @map("workspace_id") @db.Uuid
-  role        Role     @default(STAFF)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  role            Role     @default(AFFILIATE)
+  /// Granted by the Principal to selected Affiliates. A Principal can always edit dossiers.
+  canEditDossiers Boolean  @default(false) @map("can_edit_dossiers")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -81,14 +97,22 @@ model Membership {
 
 /// Hashed refresh token (sha256). Rotated on every use; revoked_at marks the old one.
 model RefreshToken {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
   /// Active workspace for the session; null until one is selected.
-  workspaceId String?   @map("workspace_id") @db.Uuid
-  tokenHash   String    @unique @map("token_hash")
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspaceId     String?   @map("workspace_id") @db.Uuid
+  tokenHash       String    @unique @map("token_hash")
+  /// "Keep me signed in": true = persistent cookie and the long lifetime; false = browser-session cookie
+  /// and the short lifetime. Carried over on every rotation.
+  persistent      Boolean   @default(true)
+  /// Set when the token was exchanged at /refresh. Presenting a rotated token again signals theft; a token
+  /// revoked any other way (logout, password change, workspace switch) is merely expired.
+  rotated         Boolean   @default(false)
+  /// users.security_version the session was authenticated under; rotation is refused once it is stale.
+  securityVersion Int       @default(0) @map("security_version")
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
@@ -115,6 +139,80 @@ model PasswordResetToken {
   /// For the expired-token sweep.
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+/// Single-use invitation into a workspace: the only way an account gains a membership. Only the SHA-256 of
+/// the emailed token is stored. A PRINCIPAL invitation is created only by a super-admin.
+model Invitation {
+  id              String    @id @default(uuid()) @db.Uuid
+  workspaceId     String    @map("workspace_id") @db.Uuid
+  /// Lowercased; the account that accepts must have this address.
+  email           String
+  role            Role
+  canEditDossiers Boolean   @default(false) @map("can_edit_dossiers")
+  tokenHash       String    @unique @map("token_hash")
+  invitedById     String?   @map("invited_by_id") @db.Uuid
+  /// When the provider accepted the invitation email. Null: not (yet) sent, so it cannot be previewed,
+  /// listed or accepted, and it has not superseded anything.
+  sentAt          DateTime? @map("sent_at") @db.Timestamptz(6)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt      DateTime? @map("accepted_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User?     @relation("InvitationsSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([email])
+  /// For the expired-invitation sweep.
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+/// What an emailed code proves. A code is accepted only for the purpose it was issued for.
+enum OtpPurpose {
+  REGISTRATION
+  LOGIN
+}
+
+/// One emailed one-time code. Only a keyed hash of the code is stored (src/modules/mfa/email-otp.service.ts).
+/// Single use: consumed_at is set by the one verification that succeeds; revoked_at when superseded.
+model EmailOtpChallenge {
+  id               String     @id @default(uuid()) @db.Uuid
+  userId           String     @map("user_id") @db.Uuid
+  purpose          OtpPurpose
+  codeHash         String     @map("code_hash")
+  /// Verification attempts so far, right or wrong. The challenge stops accepting codes at the limit.
+  attempts         Int        @default(0)
+  expiresAt        DateTime   @map("expires_at") @db.Timestamptz(6)
+  consumedAt       DateTime?  @map("consumed_at") @db.Timestamptz(6)
+  revokedAt        DateTime?  @map("revoked_at") @db.Timestamptz(6)
+  /// Set (with revoked_at) when the provider definitively did not send the code; such rows do not count
+  /// toward send limits. Null for sent codes and for ambiguous outcomes (which keep counting).
+  deliveryFailedAt DateTime?  @map("delivery_failed_at") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Send limits and supersession look up a user's recent challenges per purpose.
+  @@index([userId, purpose, createdAt])
+  /// For the expired-challenge sweep.
+  @@index([expiresAt])
+  @@map("email_otp_challenges")
+}
+
+/// Password checks at sign-in per address, in a fixed window shared by every auth instance. Keyed by the
+/// SHA-256 of the normalized address, so addresses with and without an account are counted alike and none is
+/// stored in plain text. A correct password deletes the row.
+model LoginAttempt {
+  keyHash         String   @id @map("key_hash")
+  attempts        Int
+  windowStartedAt DateTime @map("window_started_at") @db.Timestamptz(6)
+
+  /// For the sweep of passed windows.
+  @@index([windowStartedAt])
+  @@map("login_attempts")
 }
 
 /// Append-only security log. Rows outlive the user/workspace they refer to (SetNull).
