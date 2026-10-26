@@ -23,5 +23,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "prisma/seed.ts"]
+  "include": ["src", "prisma/seed.ts"]
 }
