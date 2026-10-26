@@ -1,24 +1,32 @@
 import type { Role } from '@prisma/client';
 
-/** Body of every non-2xx JSON response. */
+export type ErrorCode =
+  | 'validation_failed'
+  | 'invalid_code'
+  | 'too_many_attempts'
+  | 'resend_cooldown'
+  | 'account_exists';
+
 export interface ErrorResponse {
   error: string;
+  code?: ErrorCode | undefined;
   details?: unknown;
 }
 
-/** Returned by /register and /login: the password step passed, an MFA code is required next. */
 export interface MfaChallengeResponse {
   mfaRequired: true;
-  mfaSetupRequired: boolean;
   mfaToken: string;
+  resendAfterSeconds: number;
 }
 
-export interface MfaSetupResponse {
-  otpauthUrl: string;
-  qrDataUrl: string;
+export interface PasswordResetRequestedResponse {
+  message: string;
 }
 
-/** Returned whenever a session is issued; the refresh token travels separately as an httpOnly cookie. */
+export interface PasswordResetResponse {
+  passwordReset: true;
+}
+
 export interface SessionResponse {
   accessToken: string;
   workspaceId: string | null;
@@ -31,11 +39,92 @@ export interface WorkspaceSummary {
   role: Role;
 }
 
-export interface MeResponse {
+export interface WorkspacePermissions {
+  manageMembers: boolean;
+  configureWorkspace: boolean;
+  viewDossiers: boolean;
+  editDossiers: boolean;
+  runRehearsals: boolean;
+  viewResults: boolean;
+}
+
+export interface MemberResponse {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: Role;
+  canEditDossiers: boolean;
+  joinedAt: string;
+}
+
+export interface InvitationResponse {
   id: string;
   email: string;
+  role: Role;
+  canEditDossiers: boolean;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface WorkspaceResponse {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+}
+
+export interface VoteRules {
+  bodySize: number;
+  majorityThreshold: number;
+  quorum: number;
+}
+
+export interface WorkspaceSettingsResponse {
+  workspaceId: string;
+  name: string;
+  voteRules: VoteRules | null;
+  canConfigure: boolean;
+  updatedAt: string;
+}
+
+export interface AdminWorkspaceResponse extends WorkspaceResponse {
+  principal: { userId: string; email: string; name: string | null } | null;
+  memberCount: number;
+}
+
+export type DesignatePrincipalResponse =
+  | { status: 'transferred'; principal: MemberResponse }
+  | { status: 'invited'; invitation: InvitationResponse };
+
+export interface InvitationPreviewResponse {
+  workspaceName: string;
+  email: string;
+  role: Role;
+  accountExists: boolean;
+  expiresAt: string;
+}
+
+export interface InvitationAcceptedResponse {
+  accepted: true;
+  workspaceId: string;
+}
+
+
+export interface AccessResponse {
+  id: string;
   isSuperAdmin: boolean;
   activeWorkspaceId: string | null;
   role: Role | null;
+  permissions: WorkspacePermissions | null;
+}
+
+export interface MeResponse extends AccessResponse {
+  email: string;
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  emailVerifiedAt: string | null;
+  createdAt: string;
+  canEditDossiers: boolean;
   workspaces: WorkspaceSummary[];
 }
