@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { AuthenticationGuards } from '../../shared/middleware/authenticate.js';
 import type { SessionController } from './session.controller.js';
 
-/** Mounted under /auth. Refresh and logout are authenticated by the httpOnly refresh cookie. */
 export function createSessionRouter(controller: SessionController, guards: AuthenticationGuards): Router {
   const router = Router();
   router.post('/refresh', controller.refresh);
