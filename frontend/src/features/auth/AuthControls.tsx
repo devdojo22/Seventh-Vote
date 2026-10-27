@@ -83,3 +83,6 @@ export function Spinner() {
 
 export const TEXT_LINK_CLASS =
   'cursor-pointer rounded font-semibold text-navy underline decoration-gold/50 decoration-2 underline-offset-4 transition-colors hover:decoration-gold focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none';
+
+export const PRIMARY_LINK_CLASS =
+  'inline-flex w-full items-center justify-center rounded-xl bg-navy px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-all hover:bg-navy2 focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:outline-none';
