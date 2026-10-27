@@ -14,12 +14,10 @@ export interface GrantedMembership {
   now: Date;
 }
 
-/** Outcome of making someone the Principal: who lost the role (at most one, by the unique index). */
 export interface PrincipalChange {
   previousPrincipalId: string | null;
 }
 
-/** Revokes every live session of `userIds` that is scoped to `workspaceId`. */
 async function revokeWorkspaceSessions(
   tx: Prisma.TransactionClient,
   userIds: readonly string[],
@@ -33,13 +31,6 @@ async function revokeWorkspaceSessions(
   });
 }
 
-/**
- * Applies a granted membership inside a transaction. An AFFILIATE grant adds the membership when absent;
- * for an existing Affiliate it only adds the dossier-edit right when granted, and it never changes a
- * Principal (so it can never demote one). A PRINCIPAL grant revokes other
- * pending Principal invitations, demotes the current Principal to AFFILIATE and ends their sessions in this
- * workspace, then promotes the user; the partial unique index rejects any concurrent second Principal.
- */
 export async function grantMembership(tx: Prisma.TransactionClient, grant: GrantedMembership): Promise<PrincipalChange> {
   const { userId, workspaceId, role, canEditDossiers, now } = grant;
   if (role === Role.AFFILIATE) {
@@ -57,7 +48,6 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
     return { previousPrincipalId: null };
   }
 
-  // The role is now settled, so any other outstanding Principal invitation would only contradict it.
   await tx.invitation.updateMany({
     where: { workspaceId, role: Role.PRINCIPAL, acceptedAt: null, revokedAt: null },
     data: { revokedAt: now },
@@ -83,18 +73,10 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
 export interface MembershipRepository {
   find(userId: string, workspaceId: string): Promise<Membership | null>;
   findWithUser(userId: string, workspaceId: string): Promise<MembershipWithUser | null>;
-  /** Memberships of one user, oldest first, each with its workspace. */
   listForUser(userId: string): Promise<MembershipWithWorkspace[]>;
-  /** Members of one workspace, Principal first, then oldest first. */
   listForWorkspace(workspaceId: string): Promise<MembershipWithUser[]>;
-  /** Makes an existing member the Principal (see grantMembership). */
   transferPrincipal(userId: string, workspaceId: string, now: Date): Promise<PrincipalChange>;
-  /** Sets the dossier-edit right of an Affiliate. Returns null when no such Affiliate is in the workspace. */
   setAffiliateDossierEdit(userId: string, workspaceId: string, canEditDossiers: boolean): Promise<MembershipWithUser | null>;
-  /**
-   * Removes an Affiliate and, in the same transaction, ends their sessions scoped to the workspace.
-   * Returns false when no such Affiliate is in the workspace (a Principal is never removed here).
-   */
   removeAffiliate(userId: string, workspaceId: string, now: Date): Promise<boolean>;
 }
 
@@ -121,7 +103,6 @@ export class PrismaMembershipRepository implements MembershipRepository {
   }
 
   listForWorkspace(workspaceId: string): Promise<MembershipWithUser[]> {
-    // Enum order is PRINCIPAL, AFFILIATE, so ascending role puts the Principal first.
     return this.prisma.membership.findMany({
       where: { workspaceId },
       include: { user: true },

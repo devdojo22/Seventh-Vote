@@ -35,10 +35,7 @@ function idParam(req: Request, name: string): string {
   return parsed.data;
 }
 
-/**
- * Workspace-scoped handlers read the workspace id from `workspaceAccess(req)`, which the authorization
- * guard verified against the database, never from the body or a token claim.
- */
+
 export function createWorkspaceController(workspaces: WorkspaceService): WorkspaceController {
   return {
     create: async (req: Request, res: Response) => {

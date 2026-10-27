@@ -60,11 +60,7 @@ function toWorkspaceResponse(workspace: Workspace): WorkspaceResponse {
   };
 }
 
-/**
- * Workspace and member management. Callers are authorized by the route guards before any method runs
- * (super-admin, or `manageMembers` in the route's workspace); every method still scopes each read and
- * write by that workspace id, so an id from another workspace is simply not found.
- */
+
 export class WorkspaceService {
   constructor(private readonly deps: WorkspaceServiceDependencies) {}
 
@@ -81,7 +77,6 @@ export class WorkspaceService {
     return toWorkspaceResponse(workspace);
   }
 
-  /** Super-admin: every workspace with its current Principal. */
   async listOverview(): Promise<AdminWorkspaceResponse[]> {
     return (await this.deps.workspaces.listOverview()).map((workspace) => ({
       ...toWorkspaceResponse(workspace),
@@ -97,11 +92,7 @@ export class WorkspaceService {
     }));
   }
 
-  /**
-   * Super-admin only: designates or transfers the Principal. A current member becomes Principal at once
-   * (the previous Principal becomes an Affiliate and is signed out of the workspace); anyone else is sent
-   * a Principal invitation, and the transfer happens when they accept it.
-   */
+
   async designatePrincipal(
     actorId: string,
     workspaceId: string,
@@ -118,7 +109,6 @@ export class WorkspaceService {
       try {
         ({ previousPrincipalId } = await this.deps.memberships.transferPrincipal(user.id, workspaceId, this.deps.now()));
       } catch (error) {
-        // A concurrent transfer won the one-Principal index; this one rolled back entirely.
         if (isUniqueConstraintViolation(error)) throw new HttpError(409, 'The Principal changed meanwhile. Try again.');
         throw error;
       }
@@ -144,7 +134,6 @@ export class WorkspaceService {
     return (await this.deps.memberships.listForWorkspace(workspaceId)).map(toMemberResponse);
   }
 
-  /** Principal (or super-admin): invites an Affiliate. The role is fixed here, never taken from the request. */
   async inviteAffiliate(
     actorId: string,
     workspaceId: string,
@@ -162,7 +151,6 @@ export class WorkspaceService {
     );
   }
 
-  /** `roles`: the invitation roles the caller may manage (a Principal: Affiliate invitations only). */
   listInvitations(workspaceId: string, roles: readonly Role[]): Promise<InvitationResponse[]> {
     return this.deps.invitations.listPending(workspaceId, roles);
   }
@@ -177,7 +165,6 @@ export class WorkspaceService {
     return this.deps.invitations.revoke(actorId, workspaceId, invitationId, roles, context);
   }
 
-  /** Grants or withdraws an Affiliate's dossier-edit right. Takes effect on the Affiliate's next request. */
   async setDossierEdit(
     actorId: string,
     workspaceId: string,
@@ -197,7 +184,6 @@ export class WorkspaceService {
     return toMemberResponse(updated);
   }
 
-  /** Removes an Affiliate and ends their sessions in this workspace. The Principal must be transferred instead. */
   async removeMember(actorId: string, workspaceId: string, userId: string, context: RequestContext): Promise<void> {
     await this.requireAffiliate(
       userId,
@@ -215,12 +201,10 @@ export class WorkspaceService {
     });
   }
 
-  /** Any member (or super-admin) reads the workspace's settings, including its vote rules. */
   async getSettings(workspaceId: string, canConfigure: boolean): Promise<WorkspaceSettingsResponse> {
     return toSettingsResponse(await this.requireWorkspace(workspaceId), canConfigure);
   }
 
-  /** Principal (or super-admin): replaces the vote rules. The values are audited; they are not sensitive. */
   async updateVoteRules(
     actorId: string,
     workspaceId: string,

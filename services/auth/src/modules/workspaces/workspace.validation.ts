@@ -8,7 +8,6 @@ export const createWorkspaceSchema = z.object({
     .min(1, 'Enter a workspace name')
     .max(120)
     .regex(/^\P{Cc}+$/u, 'Name must not contain control characters'),
-  /** Stable, URL-safe identifier, e.g. "memphis-city-council". */
   slug: z
     .string()
     .trim()
@@ -19,7 +18,6 @@ export const createWorkspaceSchema = z.object({
 
 export const designatePrincipalSchema = z.object({ email: emailSchema });
 
-/** The role is never part of the body: Principals and their delegates can only invite Affiliates. */
 export const inviteAffiliateSchema = z.object({
   email: emailSchema,
   canEditDossiers: z.boolean().default(false),
@@ -27,10 +25,7 @@ export const inviteAffiliateSchema = z.object({
 
 export const updateMemberSchema = z.object({ canEditDossiers: z.boolean() });
 
-/**
- * Vote rules as counts. Strict: unknown fields are rejected rather than silently dropped, so nothing
- * else (for example a private note) can ride along into a settings request.
- */
+
 export const voteRulesSchema = z
   .object({
     bodySize: z.number().int().min(1).max(1000),
