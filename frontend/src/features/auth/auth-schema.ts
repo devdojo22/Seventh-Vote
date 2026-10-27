@@ -1,13 +1,16 @@
 import { z } from 'zod';
 
 export const PASSWORD_MIN_LENGTH = 12;
-export const PASSWORD_MAX_LENGTH = 200;
+const PASSWORD_MAX_LENGTH = 200;
 
-const email = z
-  .string()
-  .trim()
-  .min(1, 'Enter your email address.')
-  .pipe(z.email('Enter a valid email address, like name@example.gov.'));
+export const emailAddress = (required: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, required)
+    .pipe(z.email('Enter a valid email address, like name@example.gov.'));
+
+const email = emailAddress('Enter your email address.');
 
 export const loginSchema = z.object({
   email,
@@ -29,11 +32,34 @@ const passwordFields = z.object({
   confirmPassword: z.string().min(1, 'Confirm your password.'),
 });
 
-export const registerSchema = z
+const PASSWORD_MAX_BYTES = 72;
+const PERSON_NAME_MAX_LENGTH = 60;
+
+const personName = (label: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, `Enter your ${label}.`)
+    .max(PERSON_NAME_MAX_LENGTH, 'Use a shorter name.')
+    .regex(/^\P{Cc}+$/u, 'Your name contains characters that aren’t allowed.');
+
+const utf8Length = (value: string) => new TextEncoder().encode(value).length;
+
+export const newPasswordSchema = passwordFields.shape.password.refine(
+  (value) => utf8Length(value) <= PASSWORD_MAX_BYTES,
+  'This password is too long. Use fewer characters, or fewer emoji and accented letters.',
+);
+
+const newPasswordFields = z.object({
+  password: newPasswordSchema,
+  confirmPassword: passwordFields.shape.confirmPassword,
+});
+
+export const acceptInvitationSchema = z
   .object({
-    fullName: z.string().trim().min(1, 'Enter your full name.').max(120, 'Use a shorter name.'),
-    email,
-    ...passwordFields.shape,
+    firstName: personName('first name'),
+    lastName: personName('last name'),
+    ...newPasswordFields.shape,
     acceptTerms: z
       .boolean()
       .refine(Boolean, 'Accept the Terms of Service and Privacy Policy to continue.'),
@@ -41,15 +67,22 @@ export const registerSchema = z
   .refine((v) => v.password === v.confirmPassword, {
     message: 'Passwords don’t match.',
     path: ['confirmPassword'],
-    when: (payload) => passwordFields.safeParse(payload.value).success,
+    when: (payload) => newPasswordFields.safeParse(payload.value).success,
   });
 
-export type RegisterValues = z.infer<typeof registerSchema>;
+export type AcceptInvitationValues = z.infer<typeof acceptInvitationSchema>;
 
-export const MFA_CODE_LENGTH = 6;
+export const resetPasswordSchema = newPasswordFields.refine(
+  (v) => v.password === v.confirmPassword,
+  { message: 'Passwords don’t match.', path: ['confirmPassword'] },
+);
+
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+
+export const MFA_CODE_LENGTH = 8;
 
 export function mfaCodeError(code: string): string | null {
-  if (!code) return `Enter the ${MFA_CODE_LENGTH}-digit code from your authenticator app.`;
+  if (!code) return `Enter the ${MFA_CODE_LENGTH}-digit code from your email.`;
   if (!/^\d+$/.test(code)) return 'Codes contain numbers only.';
   if (code.length < MFA_CODE_LENGTH) {
     return `Enter all ${MFA_CODE_LENGTH} digits (${code.length} of ${MFA_CODE_LENGTH} entered).`;
@@ -57,30 +90,17 @@ export function mfaCodeError(code: string): string | null {
   return null;
 }
 
-export interface PasswordCheck {
-  label: string;
-  met: boolean;
-}
+export type PasswordStrength = 'weak' | 'medium' | 'strong';
 
-export function passwordChecks(password: string): PasswordCheck[] {
-  return [
-    {
-      label: `At least ${PASSWORD_MIN_LENGTH} characters`,
-      met: password.length >= PASSWORD_MIN_LENGTH,
-    },
-    {
-      label: 'Upper- and lowercase letters',
-      met: /[a-z]/.test(password) && /[A-Z]/.test(password),
-    },
-    { label: 'A number', met: /\d/.test(password) },
-    { label: 'A symbol', met: /[^A-Za-z0-9]/.test(password) },
-  ];
-}
+const PASSPHRASE_LENGTH = 16;
 
-export type PasswordStrength = 0 | 1 | 2 | 3 | 4;
+const CHARACTER_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
 
-export function passwordStrength(password: string): PasswordStrength {
-  if (!password) return 0;
-  if (password.length < PASSWORD_MIN_LENGTH) return 1;
-  return passwordChecks(password).filter((c) => c.met).length as PasswordStrength;
+
+export function passwordStrength(password: string): PasswordStrength | null {
+  if (!password) return null;
+  if (password.length < PASSWORD_MIN_LENGTH) return 'weak';
+  const variety = CHARACTER_CLASSES.filter((pattern) => pattern.test(password)).length;
+  const score = variety + (password.length >= PASSPHRASE_LENGTH ? 1 : 0);
+  return score >= 4 ? 'strong' : 'medium';
 }
