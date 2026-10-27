@@ -15,18 +15,11 @@ import {
   TEXT_LINK_CLASS,
   type AuthNoticeContent,
 } from './AuthControls';
+import { requestPasswordReset } from './auth-api';
+import { describeResetRequestError } from './auth-errors';
 import { forgotPasswordSchema, type ForgotPasswordValues } from './auth-schema';
 
 const CONFIRMATION_TITLE_ID = 'forgot-password-confirmation';
-
-const REQUEST_FAILED: AuthNoticeContent = {
-  title: 'We couldn’t take your request',
-  body: 'Something went wrong. Check your connection and try again.',
-};
-
-function requestPasswordReset(): Promise<void> {
-  return Promise.resolve();
-}
 
 type View = 'form' | 'confirmation';
 
@@ -62,11 +55,11 @@ export function ForgotPasswordPage() {
   const onSubmit = async ({ email }: ForgotPasswordValues) => {
     setSubmitError(null);
     try {
-      await requestPasswordReset();
+      await requestPasswordReset(email.toLowerCase());
       setSubmittedEmail(email);
       switchView('confirmation');
-    } catch {
-      setSubmitError(REQUEST_FAILED);
+    } catch (error) {
+      setSubmitError(describeResetRequestError(error));
     }
   };
 
@@ -75,8 +68,8 @@ export function ForgotPasswordPage() {
       <section>
         <AuthHeading
           eyebrow="Account recovery"
-          title="Password reset request"
-          description="Your request passed validation in the browser. Here is where things stand."
+          title="Check your email"
+          description="If an account exists for this email, you will receive password-reset instructions."
           titleId={CONFIRMATION_TITLE_ID}
         />
 
@@ -91,10 +84,9 @@ export function ForgotPasswordPage() {
             </div>
           </div>
 
-          <Callout title="No email was sent">
-            Password reset isn’t connected yet. It’s being built with sign-in for Milestone 2. Once
-            it is, a reset link will be sent to this address if it belongs to a Seventh Vote
-            account. Until then, ask your workspace administrator to restore your access.
+          <Callout title="The link works for 15 minutes">
+            Open the link in the email to choose a new password. It can be used once. If nothing
+            arrives within a few minutes, check your spam folder or request a new link.
           </Callout>
 
           <div className="grid gap-3 sm:grid-cols-2">

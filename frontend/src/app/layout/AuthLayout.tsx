@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import { Outlet, useLocation } from 'react-router';
+import { BrandLogo } from '@/components/BrandLogo';
 import { LockIcon, ShieldIcon, SourceDocIcon, type IconProps } from '@/components/ui/icons';
 import { useCouncilStore } from '@/stores/council-store';
 
@@ -13,7 +14,7 @@ const ASSURANCES: Assurance[] = [
   {
     Icon: LockIcon,
     title: 'Multi-factor sign-in',
-    body: 'After your password, you confirm a one-time code from your authenticator app.',
+    body: 'After your password, you enter a one-time code we email to you.',
   },
   {
     Icon: ShieldIcon,
@@ -27,17 +28,6 @@ const ASSURANCES: Assurance[] = [
   },
 ];
 
-function LogoMark({ className = '' }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`grid size-8 place-items-center rounded-lg bg-linear-to-br from-gold to-[#a77d27] font-display text-[17px] font-bold text-navy shadow-sm ${className}`}
-    >
-      7
-    </span>
-  );
-}
-
 function BrandPanel() {
   const seatCount = useCouncilStore((s) => s.config.seatCount);
   const snapshotLabel = useCouncilStore((s) => s.config.snapshotLabel);
@@ -49,9 +39,8 @@ function BrandPanel() {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgb(200_155_60/0.14),transparent_55%)]"
       />
 
-      <div className="relative flex items-center gap-2.5">
-        <LogoMark />
-        <span className="font-display text-[17px] font-bold tracking-tight">Seventh Vote</span>
+      <div className="relative">
+        <BrandLogo />
       </div>
 
       <div className="relative my-auto py-12">
@@ -106,8 +95,7 @@ export function AuthLayout() {
 
       <main id="main" className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-2.5 bg-navy px-4 text-white shadow-[0_1px_0_rgb(200_155_60/0.55)] sm:px-6 lg:hidden">
-          <LogoMark />
-          <span className="font-display text-[17px] font-bold tracking-tight">Seventh Vote</span>
+          <BrandLogo />
         </header>
 
         <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 sm:py-14 lg:px-10">

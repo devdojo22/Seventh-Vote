@@ -24,7 +24,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next
     return;
   }
   if (error instanceof HttpError) {
-    const body: ErrorResponse = { error: error.message, details: error.details };
+    const body: ErrorResponse = { error: error.message, code: error.code, details: error.details };
     res.status(error.status).json(body);
     return;
   }

@@ -9,7 +9,6 @@ interface ProfileSectionProps {
   children: ReactNode;
 }
 
-/** A titled card section on My Profile; the heading id lets the sidebar jump list target it. */
 export function ProfileSection({ id, title, description, action, children }: ProfileSectionProps) {
   return (
     <Card padded={false} className="scroll-mt-20">

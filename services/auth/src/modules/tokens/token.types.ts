@@ -1,22 +1,26 @@
-import { Role } from '@prisma/client';
+import { OtpPurpose, Role } from '@prisma/client';
 import { z } from 'zod';
 
-/**
- * Access-token claims. This is the contract the API service verifies:
- * typ=access, mfa=true, wid (active workspace or null), role (or null), sub = user id.
- */
+const securityVersionClaim = z.number().int().nonnegative();
+
+
 export const accessTokenClaimsSchema = z.object({
   typ: z.literal('access'),
   sub: z.string().uuid(),
   mfa: z.literal(true),
   wid: z.string().uuid().nullable(),
   role: z.nativeEnum(Role).nullable(),
+  sv: securityVersionClaim,
 });
 
-/** Short-lived proof that the password step passed; accepted only by /mfa/* routes. */
+
 export const mfaTokenClaimsSchema = z.object({
   typ: z.literal('mfa'),
   sub: z.string().uuid(),
+  cid: z.string().uuid(),
+  pur: z.literal(OtpPurpose.LOGIN),
+  rem: z.boolean().default(false),
+  sv: securityVersionClaim,
 });
 
 export type AccessTokenClaims = z.infer<typeof accessTokenClaimsSchema>;
@@ -28,4 +32,14 @@ export interface AccessTokenInput {
   userId: string;
   workspaceId: string | null;
   role: Role | null;
+  securityVersion: number;
+}
+
+export interface MfaTokenInput {
+  userId: string;
+  challengeId: string;
+  purpose: OtpPurpose;
+  rememberDevice: boolean;
+  securityVersion: number;
+  ttlSeconds: number;
 }

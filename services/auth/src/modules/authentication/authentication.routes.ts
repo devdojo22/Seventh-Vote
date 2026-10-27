@@ -3,22 +3,29 @@ import type { AuthenticationGuards } from '../../shared/middleware/authenticate.
 import type { RateLimiters } from '../../shared/middleware/rate-limit.js';
 import type { AuthenticationController } from './authentication.controller.js';
 
-/** Mounted under /auth. Middleware order is rate limit, then token check, then body validation. */
 export function createAuthenticationRouter(
   controller: AuthenticationController,
   guards: AuthenticationGuards,
   limiters: RateLimiters,
 ): Router {
   const router = Router();
-  router.post('/register', limiters.credentialsByIp, controller.register);
-  router.post('/login', limiters.credentialsByIp, controller.login);
-  router.post('/mfa/setup', guards.requireMfaToken, controller.startMfaSetup);
+  router.post('/login', limiters.loginFailuresByIp, controller.login);
   router.post(
     '/mfa/verify',
-    limiters.credentialsByIp,
+    limiters.mfaVerifyFailuresByIp,
     guards.requireMfaToken,
-    limiters.mfaFailuresByAccount,
+    limiters.credentialFailuresByAccount,
     controller.verifyMfa,
+  );
+  router.post('/mfa/resend', limiters.mfaResendByIp, guards.requireMfaToken, controller.resendMfaCode);
+  router.post('/password/forgot', limiters.forgotPasswordByIp, controller.forgotPassword);
+  router.post('/password/reset', limiters.resetPasswordByIp, controller.resetPassword);
+  router.post(
+    '/password/change',
+    limiters.changePasswordFailuresByIp,
+    guards.requireAccess,
+    limiters.credentialFailuresByAccount,
+    controller.changePassword,
   );
   return router;
 }

@@ -8,9 +8,9 @@ export interface AuditRepository {
 export class PrismaAuditRepository implements AuditRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async insert({ action, userId, ip, meta }: AuditEntry): Promise<void> {
+  async insert({ action, userId, workspaceId = null, ip, meta }: AuditEntry): Promise<void> {
     await this.prisma.auditLog.create({
-      data: { action, userId, ip, ...(meta === undefined ? {} : { meta }) },
+      data: { action, userId, workspaceId, ip, ...(meta === undefined ? {} : { meta }) },
     });
   }
 }

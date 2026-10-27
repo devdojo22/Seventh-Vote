@@ -17,11 +17,6 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
-      // node:test's describe/it return promises the runner itself tracks.
-      '@typescript-eslint/no-floating-promises': [
-        'error',
-        { allowForKnownSafeCalls: [{ from: 'package', package: 'node:test', name: ['describe', 'it', 'test'] }] },
-      ],
       eqeqeq: ['error', 'always'],
     },
   },
