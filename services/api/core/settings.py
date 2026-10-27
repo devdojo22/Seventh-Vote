@@ -7,8 +7,7 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.environ.get("DJANGO_DEBUG") == "true"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost").split(",")
 
-# App users live in the Express auth service. django.contrib.auth is here only
-# for Django admin staff accounts; the API itself authenticates via JWT.
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -49,7 +48,6 @@ STATIC_URL = "static/"
 ROOT_URLCONF = "core.urls"
 WSGI_APPLICATION = "core.wsgi.application"
 
-# Django owns the "app" schema only; Prisma owns "auth".
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -68,15 +66,15 @@ TIME_ZONE = "America/New_York"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.AuthServiceJWTAuthentication"],
-    "DEFAULT_PERMISSION_CLASSES": ["core.permissions.IsWorkspaceCAO"],
+    "DEFAULT_PERMISSION_CLASSES": ["core.permissions.IsWorkspaceMember"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "UNAUTHENTICATED_USER": None,
 }
 
-# Shared with the Express auth service.
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ISSUER = os.environ.get("JWT_ISSUER", "seventh-vote-auth")
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "seventh-vote")
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth:4000").rstrip("/")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or None
 LLM_MODEL = os.environ.get("LLM_MODEL", "claude-opus-5-5")
