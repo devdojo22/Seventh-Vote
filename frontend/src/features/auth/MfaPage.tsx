@@ -28,8 +28,6 @@ export function MfaPage() {
   const [endedNotice, setEndedNotice] = useState<AuthNoticeContent | null>(null);
 
   const verify = async (mfaToken: string, code: string) => {
-    // Clears anything a previous account left in this tab, then starts the new session; the route guard
-    // loads the account (GET /auth/me) with this token before the app renders.
     startSession(await verifyLoginMfa(mfaToken, code));
     clearChallenge();
     void navigate(readReturnTo(location.state), { replace: true });

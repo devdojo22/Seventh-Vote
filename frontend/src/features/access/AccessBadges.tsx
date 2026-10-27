@@ -20,8 +20,6 @@ export function RoleBadge({ role }: { role: Role }) {
 }
 
 export function MembershipBadge({ role, workspace }: { role: Role; workspace: string }) {
-  // Workspace names can be long ("Metropolitan Government of …"): the badge never grows past its container
-  // and the name truncates, with the full name in the tooltip.
   return (
     <Badge className={`max-w-full ${ROLE_CLASSES[role]}`}>
       {role === 'PRINCIPAL' && (

@@ -26,13 +26,11 @@ import type { PasswordResetState } from './return-to';
 export function ResetPasswordPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  // Read once and kept in memory only; never written to storage.
   const [token] = useState(() => readLinkToken(location.hash));
   const [linkInvalid, setLinkInvalid] = useState(token === null);
   const [notice, setNotice] = useState<AuthNoticeContent | null>(null);
   const inFlight = useRef(false);
 
-  // Drop the token from the address bar and history as soon as it has been read.
   useEffect(() => {
     if (location.hash) void navigate(location.pathname, { replace: true });
   }, [location.hash, location.pathname, navigate]);

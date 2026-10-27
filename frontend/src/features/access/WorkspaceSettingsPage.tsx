@@ -18,7 +18,6 @@ const count = (label: string) =>
     .int('Use a whole number.')
     .min(1, 'Use at least 1.');
 
-/** Mirrors the server's rules for display; the auth service validates again and decides. */
 const voteRulesFormSchema = z
   .object({
     bodySize: count('body size').max(1000, 'Use at most 1000.'),
@@ -161,10 +160,6 @@ function VoteRulesForm({
   );
 }
 
-/**
- * The workspace's vote rules: body size, majority threshold and quorum. Read-only for Affiliates; the
- * Principal (or a super-admin) edits them. The server enforces who may read and who may change them.
- */
 export function WorkspaceSettingsPage() {
   const { workspaceId = '' } = useParams();
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });

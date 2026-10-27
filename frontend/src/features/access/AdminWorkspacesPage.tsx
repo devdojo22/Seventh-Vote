@@ -188,7 +188,6 @@ function DesignatePrincipalDialog({
   );
 }
 
-/** Platform administration: create workspaces and designate or transfer each one's Principal. */
 export function AdminWorkspacesPage() {
   const user = useCurrentUser();
   const showToast = useAppStore((s) => s.showToast);
