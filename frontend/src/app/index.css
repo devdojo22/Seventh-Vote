@@ -27,6 +27,7 @@
 
   --animate-fade-in: fade-in 0.25s ease-out;
   --animate-slide-in-right: slide-in-right 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-loader-dot: loader-dot 1.4s ease-in-out infinite;
 
   @keyframes fade-in {
     from {
@@ -44,6 +45,28 @@
     }
     to {
       transform: translateX(0);
+    }
+  }
+  @keyframes loader-dot {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+      background-color: var(--color-navy);
+    }
+    6% {
+      background-color: var(--color-gold);
+    }
+    12% {
+      transform: translateY(-6px) scale(1.25);
+    }
+    20% {
+      background-color: var(--color-gold);
+    }
+    26% {
+      background-color: var(--color-navy);
+    }
+    30% {
+      transform: translateY(0) scale(1);
     }
   }
 }
