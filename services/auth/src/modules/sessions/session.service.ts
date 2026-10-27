@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { SessionPolicy } from '../../config/environment.js';
 import { HttpError } from '../../shared/errors/http-error.js';
 import type { SessionResponse } from '../../shared/types/api.types.js';
@@ -35,6 +36,7 @@ export class SessionService {
     membership: MembershipScope | null,
     persistent: boolean,
     securityVersion: number,
+    sessionId: string = randomUUID(),
   ): Promise<IssuedSession> {
     const refreshToken = randomToken();
     const { persistentTtlMs, browserSessionTtlMs } = this.deps.policy;
@@ -44,12 +46,13 @@ export class SessionService {
     await this.deps.refreshTokens.create({
       userId,
       workspaceId,
+      sessionId,
       tokenHash: sha256(refreshToken),
       persistent,
       expiresAt: new Date(this.now().getTime() + lifetimeMs),
       securityVersion,
     });
-    const accessToken = this.deps.tokens.signAccessToken({ userId, workspaceId, role, securityVersion });
+    const accessToken = this.deps.tokens.signAccessToken({ userId, workspaceId, role, securityVersion, sessionId });
     return {
       body: { accessToken, workspaceId, role },
       refreshToken,
@@ -63,9 +66,15 @@ export class SessionService {
     workspaceId: string | null,
     persistent: boolean,
     securityVersion: number,
+    sessionId?: string,
   ): Promise<IssuedSession> {
     const membership = workspaceId === null ? null : await this.deps.memberships.find(userId, workspaceId);
-    return this.issue(userId, membership, persistent, securityVersion);
+    return this.issue(userId, membership, persistent, securityVersion, sessionId);
+  }
+
+  /** Whether the sign-in an access token belongs to has not been ended (logout, removal, theft, expiry). */
+  isSessionLive(sessionId: string, userId: string): Promise<boolean> {
+    return this.deps.refreshTokens.isSessionLive(sessionId, userId, this.now());
   }
 
 
@@ -76,7 +85,7 @@ export class SessionService {
       case 'invalid':
         throw new HttpError(401, 'Session expired');
       case 'reused':
-        this.deps.audit.record(context, {
+        await this.deps.audit.record(context, {
           action: 'auth.refresh_reuse',
           userId: result.userId,
           workspaceId: result.workspaceId,
@@ -87,7 +96,13 @@ export class SessionService {
         context.log.info({ userId: result.userId }, 'refresh lost a concurrent rotation of the same token');
         throw new HttpError(409, 'Session was refreshed by another request');
       case 'consumed':
-        return this.issueInWorkspace(result.userId, result.workspaceId, result.persistent, result.securityVersion);
+        return this.issueInWorkspace(
+          result.userId,
+          result.workspaceId,
+          result.persistent,
+          result.securityVersion,
+          result.sessionId,
+        );
     }
   }
 
@@ -95,7 +110,7 @@ export class SessionService {
     if (rawToken === undefined) return;
     const revoked = await this.deps.refreshTokens.revoke(sha256(rawToken), this.now());
     if (revoked) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.logout',
         userId: revoked.userId,
         workspaceId: revoked.workspaceId,
@@ -119,8 +134,14 @@ export class SessionService {
     if (!membership) throw new HttpError(403, 'Not a member of that workspace');
     const revoked = await this.deps.refreshTokens.revokeForUser(sha256(rawToken), userId, this.now());
     if (!revoked) throw new HttpError(401, 'Session expired');
-    const session = await this.issue(userId, membership, revoked.persistent, revoked.securityVersion);
-    this.deps.audit.record(context, {
+    const session = await this.issue(
+      userId,
+      membership,
+      revoked.persistent,
+      revoked.securityVersion,
+      revoked.sessionId,
+    );
+    await this.deps.audit.record(context, {
       action: 'auth.workspace_switched',
       userId,
       workspaceId,

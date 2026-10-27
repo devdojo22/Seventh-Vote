@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 export interface NewRefreshToken {
   userId: string;
   workspaceId: string | null;
+  sessionId: string;
   tokenHash: string;
   persistent: boolean;
   expiresAt: Date;
@@ -10,13 +11,21 @@ export interface NewRefreshToken {
 }
 
 export type ConsumeResult =
-  | { status: 'consumed'; userId: string; workspaceId: string | null; persistent: boolean; securityVersion: number }
+  | {
+      status: 'consumed';
+      userId: string;
+      workspaceId: string | null;
+      sessionId: string;
+      persistent: boolean;
+      securityVersion: number;
+    }
   | { status: 'reused'; userId: string; workspaceId: string | null }
   | { status: 'superseded'; userId: string }
 
   | { status: 'invalid' };
 
 export interface ClaimedSession {
+  sessionId: string;
   persistent: boolean;
   securityVersion: number;
 }
@@ -34,6 +43,8 @@ export interface RefreshTokenRepository {
   revokeForUser(tokenHash: string, userId: string, now: Date): Promise<ClaimedSession | null>;
   findPersistence(tokenHash: string, userId: string, now: Date): Promise<boolean | null>;
   revoke(tokenHash: string, now: Date): Promise<RevokedSession | null>;
+  /** True while the sign-in session still has an unrevoked, unexpired token; access tokens depend on it. */
+  isSessionLive(sessionId: string, userId: string, now: Date): Promise<boolean>;
 }
 
 export class PrismaRefreshTokenRepository implements RefreshTokenRepository {
@@ -65,6 +76,7 @@ export class PrismaRefreshTokenRepository implements RefreshTokenRepository {
         status: 'consumed',
         userId: stored.userId,
         workspaceId: stored.workspaceId,
+        sessionId: stored.sessionId,
         persistent: stored.persistent,
         securityVersion: stored.securityVersion,
       };
@@ -75,10 +87,18 @@ export class PrismaRefreshTokenRepository implements RefreshTokenRepository {
 
     if (stored.revokedAt === null) return { status: 'superseded', userId: stored.userId };
 
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: stored.userId, revokedAt: null },
-      data: { revokedAt: now },
-    });
+    // Suspected theft: end every session and move the security version, which also rejects any access
+    // token or half-finished sign-in the holder of the stolen token may already have.
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+      this.prisma.user.update({
+        where: { id: stored.userId },
+        data: { securityVersion: { increment: 1 } },
+      }),
+    ]);
     return { status: 'reused', userId: stored.userId, workspaceId: stored.workspaceId };
   }
 
@@ -90,7 +110,7 @@ export class PrismaRefreshTokenRepository implements RefreshTokenRepository {
       data: { revokedAt: now },
     });
     if (count !== 1 || !(await this.isCurrentVersion(userId, stored.securityVersion))) return null;
-    return { persistent: stored.persistent, securityVersion: stored.securityVersion };
+    return { sessionId: stored.sessionId, persistent: stored.persistent, securityVersion: stored.securityVersion };
   }
   
   private async isCurrentVersion(userId: string, securityVersion: number): Promise<boolean> {
@@ -112,5 +132,13 @@ export class PrismaRefreshTokenRepository implements RefreshTokenRepository {
       data: { revokedAt: now },
     });
     return count === 1 ? { userId: stored.userId, workspaceId: stored.workspaceId } : null;
+  }
+
+  async isSessionLive(sessionId: string, userId: string, now: Date): Promise<boolean> {
+    const live = await this.prisma.refreshToken.findFirst({
+      where: { sessionId, userId, revokedAt: null, expiresAt: { gt: now } },
+      select: { id: true },
+    });
+    return live !== null;
   }
 }

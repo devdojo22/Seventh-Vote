@@ -90,7 +90,7 @@ export class InvitationService {
         'invitation email could not be sent',
       );
       await this.deps.invitations.revoke(invitation.id, workspace.id, now, [role]);
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'invitation.email_failed',
         userId: invitedById,
         workspaceId: workspace.id,
@@ -102,7 +102,7 @@ export class InvitationService {
     if (!(await this.deps.invitations.markSent(invitation, this.deps.now()))) {
       // Revoked while its email was in flight (e.g. a Principal transfer completed); the emailed link is dead
       // and nothing was superseded. Recorded, since the recipient holds an email no other entry explains.
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'invitation.cancelled_while_sending',
         userId: invitedById,
         workspaceId: workspace.id,
@@ -113,7 +113,7 @@ export class InvitationService {
         'The invitation was withdrawn while its email was being sent, so the emailed link will not work. Invite again.',
       );
     }
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'invitation.created',
       userId: invitedById,
       workspaceId: workspace.id,
@@ -138,7 +138,7 @@ export class InvitationService {
     if (!(await this.deps.invitations.revoke(invitationId, workspaceId, this.deps.now(), roles))) {
       throw new HttpError(404, 'Invitation not found');
     }
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'invitation.revoked',
       userId: actorId,
       workspaceId,
@@ -162,7 +162,7 @@ export class InvitationService {
   /** Creates the invited account (its email counts as verified: the link reached it) and its membership. */
   async acceptWithNewAccount(input: AcceptInvitationInput, context: RequestContext): Promise<InvitationAcceptedResponse> {
     const invitation = await this.usable(input.token);
-    if (!invitation) return this.reject(context, null, 'invalid');
+    if (!invitation) return await this.reject(context, null, 'invalid');
     // Checked again inside the transaction; this read only spares the password hash on a request bound to fail.
     if (await this.deps.users.findByEmail(invitation.email)) throw accountExists();
     const passwordHash = await this.deps.passwords.hash(input.password);
@@ -178,16 +178,16 @@ export class InvitationService {
       if (isUniqueConstraintViolation(error)) throw new HttpError(409, 'The invitation could not be accepted. Try again.');
       throw error;
     }
-    return this.finish(result, invitation, context, true);
+    return await this.finish(result, invitation, context, true);
   }
 
   /** Adds the membership to the signed-in account, which must have the invited email. */
   /** `user` is the signed-in account, as loaded and checked by `requireAccess` for this request. */
   async join(user: User, token: string, context: RequestContext): Promise<InvitationAcceptedResponse> {
     const invitation = await this.usable(token);
-    if (!invitation) return this.reject(context, user.id, 'invalid');
+    if (!invitation) return await this.reject(context, user.id, 'invalid');
     if (user.email !== invitation.email) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'invitation.accept_failed',
         userId: user.id,
         workspaceId: invitation.workspaceId,
@@ -202,7 +202,7 @@ export class InvitationService {
       if (isUniqueConstraintViolation(error)) throw new HttpError(409, 'The invitation could not be accepted. Try again.');
       throw error;
     }
-    return this.finish(result, invitation, context, false);
+    return await this.finish(result, invitation, context, false);
   }
 
   private async usable(token: string): Promise<InvitationWithWorkspace | null> {
@@ -211,27 +211,27 @@ export class InvitationService {
     return invitation.expiresAt > this.deps.now() ? invitation : null;
   }
 
-  private reject(context: RequestContext, userId: string | null, reason: string): never {
-    this.deps.audit.record(context, { action: 'invitation.accept_failed', userId, meta: { reason } });
+  private async reject(context: RequestContext, userId: string | null, reason: string): Promise<never> {
+    await this.deps.audit.record(context, { action: 'invitation.accept_failed', userId, meta: { reason } });
     throw new HttpError(400, INVALID_INVITATION);
   }
 
-  private finish(
+  private async finish(
     result: AcceptResult,
     invitation: Invitation,
     context: RequestContext,
     newAccount: boolean,
-  ): InvitationAcceptedResponse {
+  ): Promise<InvitationAcceptedResponse> {
     if (result.status === 'account-exists') throw accountExists();
-    if (result.status === 'invalid') return this.reject(context, null, 'invalid');
-    this.deps.audit.record(context, {
+    if (result.status === 'invalid') return await this.reject(context, null, 'invalid');
+    await this.deps.audit.record(context, {
       action: 'invitation.accepted',
       userId: result.userId,
       workspaceId: result.workspaceId,
       meta: { invitationId: invitation.id, role: result.role, newAccount },
     });
     if (result.role === Role.PRINCIPAL) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'workspace.principal_transferred',
         userId: invitation.invitedById,
         workspaceId: result.workspaceId,
