@@ -1,15 +1,12 @@
-import type { Role, UserStatus } from '@/types/access';
+import type { Role } from '@/types/access';
 
-export const ROLE_LABELS: Record<Role, string> = { CAO: 'CAO', STAFF: 'Staff' };
+export const ROLE_LABELS: Record<Role, string> = { PRINCIPAL: 'Principal', AFFILIATE: 'Affiliate' };
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  CAO: 'Full use of this workspace: sessions, dossiers and prep briefs.',
-  STAFF: 'Rights not defined yet; awaiting client confirmation for M2.',
-};
-
-export const STATUS_LABELS: Record<UserStatus, string> = {
-  active: 'Active',
-  'mfa-pending': 'MFA setup pending',
+  PRINCIPAL:
+    'Owns this workspace: invites and removes Affiliates, sets their permissions, and controls workspace settings.',
+  AFFILIATE:
+    'Views dossiers, runs rehearsals and views results. Editing dossiers needs the Principal’s permission.',
 };
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
