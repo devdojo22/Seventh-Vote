@@ -11,12 +11,10 @@ import { useCouncilStore } from './council-store';
 
 interface PrepState {
   values: PrepValues;
-  /** Session loaded via "Use current session item"; later briefs share its settings. */
   sessionContext: SessionInput | null;
   brief: PrepBrief | null;
   loadFromSession: (input: SessionInput) => void;
   build: (values: PrepValues) => void;
-  /** Forgets the signed-in user's prep form and brief (sign-out, expiry, another account signing in). */
   reset: () => void;
 }
 

@@ -26,7 +26,6 @@ export function PersonalInfoCard() {
             <ReadOnlyValue label="Last name" value={user.lastName ?? 'Not provided'} />
           </>
         ) : (
-          // Accounts created before first and last names were collected separately.
           <ReadOnlyValue label="Full name" value={user.name?.trim() || 'Not provided'} />
         )}
         <ReadOnlyValue label="Email address" value={user.email} />
