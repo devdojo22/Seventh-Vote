@@ -2,6 +2,9 @@ import { createApp } from './app.js';
 import { ConfigurationError, loadConfig, type AppConfig } from './config/environment.js';
 import { createDatabaseHealthCheck, createPrismaRepositories, createServices } from './dependencies.js';
 import { createPrismaClient } from './infrastructure/database/prisma.client.js';
+import { NylasEmailSender } from './infrastructure/email/email-sender.js';
+import { startCleanupJob } from './modules/cleanup/cleanup.job.js';
+import { PrismaCleanupRepository } from './modules/cleanup/cleanup.repository.js';
 import { createLogger } from './infrastructure/logging/logger.js';
 
 function loadConfigOrExit(): AppConfig {
@@ -25,7 +28,7 @@ const prisma = createPrismaClient(config.databaseUrl);
 const app = createApp({
   config,
   logger,
-  services: createServices(config, createPrismaRepositories(prisma)),
+  services: createServices(config, createPrismaRepositories(prisma), new NylasEmailSender(config.email)),
   checkDatabase: createDatabaseHealthCheck(prisma),
 });
 
@@ -37,12 +40,15 @@ const server = app.listen(config.port, (error?: Error) => {
   logger.info({ port: config.port, env: config.nodeEnv }, 'auth service listening');
 });
 
+const cleanup = startCleanupJob(new PrismaCleanupRepository(prisma), config.cleanup, logger);
+
 let shuttingDown = false;
 
 function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, 'shutting down');
+  cleanup.stop();
   const forceExit = setTimeout(() => {
     logger.error('graceful shutdown timed out');
     process.exit(1);
