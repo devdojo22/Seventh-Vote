@@ -1,46 +1,36 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Link } from 'react-router';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
-import {
-  AlertIcon,
-  ArrowUpRightIcon,
-  CheckCircleIcon,
-  LockIcon,
-  ShieldIcon,
-  SourceDocIcon,
-} from '@/components/ui/icons';
-import { Switch } from '@/components/ui/Switch';
+import { CheckCircleIcon, LockIcon, ShieldIcon, SourceDocIcon } from '@/components/ui/icons';
+import { formatDate } from '@/features/access/access-labels';
+import { describedBy } from '@/lib/aria';
 import {
   AuthNotice,
   PasswordInput,
-  TEXT_LINK_CLASS,
+  Spinner,
   type AuthNoticeContent,
 } from '@/features/auth/AuthControls';
+import { describeChangePasswordError } from '@/features/auth/auth-errors';
 import { PASSWORD_MIN_LENGTH } from '@/features/auth/auth-schema';
+import { changeOwnPassword } from '@/features/auth/auth-session';
 import { PasswordStrengthMeter } from '@/features/auth/PasswordStrengthMeter';
-import { useProfileStore } from '@/stores/profile-store';
+import { useCurrentUser } from '@/stores/auth-session-store';
 import { changePasswordSchema, type ChangePasswordValues } from './profile-schema';
 import { ProfileSection } from './ProfileSection';
 
-const PASSWORD_PENDING: AuthNoticeContent = {
-  title: 'Password changes aren’t connected yet',
-  body: 'Your new password passed validation, but the auth service endpoint is still being built for Milestone 2. Your password was not changed and nothing was sent or stored.',
-};
-
-const MFA_PENDING: AuthNoticeContent = {
-  title: 'This switch only changes the display',
-  body: 'Enrolling or removing an authenticator app arrives with Milestone 2. MFA was not actually enabled or disabled, and nothing was sent or stored.',
+const PASSWORD_CHANGED: AuthNoticeContent = {
+  title: 'Password changed',
+  body: 'You stay signed in here. Other devices have been signed out and must sign in with the new password.',
 };
 
 const SECURITY_FEATURES = [
   {
     Icon: LockIcon,
     title: 'Multi-factor sign-in',
-    body: 'A one-time code from your authenticator app is required after your password.',
+    body: 'A one-time code sent to your email is required after your password.',
   },
   {
     Icon: ShieldIcon,
@@ -54,32 +44,45 @@ const SECURITY_FEATURES = [
   },
 ];
 
-function describedBy(...ids: (string | false | undefined)[]) {
-  return ids.filter(Boolean).join(' ') || undefined;
-}
-
 export function AccountSecurityCard() {
-  const user = useProfileStore((s) => s.user);
-  // Respect a genuine MFA status when the account has one; otherwise the switch starts off.
-  const [mfaEnabled, setMfaEnabled] = useState<boolean>(() => user.mfaEnabled ?? false);
-  const [mfaTouched, setMfaTouched] = useState(false);
+  const user = useCurrentUser();
   const [passwordNotice, setPasswordNotice] = useState<AuthNoticeContent | null>(null);
-
-  const toggleMfa = (next: boolean) => {
-    setMfaEnabled(next);
-    setMfaTouched(true);
-  };
+  const inFlight = useRef(false);
 
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors },
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
   } = useForm<ChangePasswordValues>({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
   const newPassword = useWatch({ control, name: 'newPassword' });
+
+  const onValid = async (values: ChangePasswordValues) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPasswordNotice(null);
+    try {
+      // The server signs out every session and returns a new one for this tab. Nothing to show if this tab
+      // was signed out (or signed in as someone else) meanwhile: the route guard has already moved on.
+      if (!(await changeOwnPassword(values))) return;
+      reset();
+      setPasswordNotice(PASSWORD_CHANGED);
+    } catch (error) {
+      const view = describeChangePasswordError(error);
+      for (const field of ['currentPassword', 'newPassword', 'confirmPassword'] as const) {
+        const message = view.fieldErrors[field];
+        if (message) setError(field, { type: 'server', message });
+      }
+      setPasswordNotice(view.notice);
+    } finally {
+      inFlight.current = false;
+    }
+  };
 
   return (
     <ProfileSection
@@ -94,49 +97,19 @@ export function AccountSecurityCard() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Switch
-                id="profile-mfa"
-                checked={mfaEnabled}
-                onChange={toggleMfa}
-                label="Multi-factor authentication"
-                describedBy="profile-mfa-status"
-              />
-              <Badge
-                className={
-                  mfaEnabled
-                    ? 'bg-pine-bg text-pine'
-                    : 'border border-gold/35 bg-amber-bg text-amber'
-                }
-              >
-                {mfaEnabled ? (
-                  <CheckCircleIcon className="size-3.5" />
-                ) : (
-                  <AlertIcon className="size-3.5 text-gold" />
-                )}
-                {mfaEnabled ? 'Enabled' : 'Disabled'}
+              <h3 className="text-sm font-semibold text-navy">Multi-factor authentication</h3>
+              <Badge className="bg-pine-bg text-pine">
+                <CheckCircleIcon className="size-3.5" />
+                Always on
               </Badge>
             </div>
-            <p
-              id="profile-mfa-status"
-              aria-live="polite"
-              className="mt-2 text-[13px] leading-relaxed text-muted"
-            >
-              {mfaEnabled
-                ? 'Every sign-in asks for a 6-digit code from your authenticator app after your password.'
-                : 'Sign-in uses your password only. Turn this on to require an authenticator code as well.'}
+            <p className="mt-2 text-[13px] leading-relaxed text-muted">
+              Every sign-in asks for an 8-digit code sent to{' '}
+              <strong className="font-semibold break-all text-navy">{user.email}</strong> after your
+              password.
+              {user.emailVerifiedAt &&
+                ` Email verified ${formatDate(user.emailVerifiedAt.slice(0, 10))}.`}
             </p>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                to="/verify"
-                className={`inline-flex items-center gap-1 text-xs ${TEXT_LINK_CLASS}`}
-              >
-                Open verification screen
-                <ArrowUpRightIcon className="size-3.5" />
-              </Link>
-            </div>
-            <div className={mfaTouched ? 'mt-3' : undefined}>
-              <AuthNotice notice={mfaTouched ? MFA_PENDING : null} />
-            </div>
           </div>
         </div>
 
@@ -144,7 +117,8 @@ export function AccountSecurityCard() {
           noValidate
           className="grid gap-5"
           aria-labelledby="profile-password-title"
-          onSubmit={(e) => void handleSubmit(() => setPasswordNotice(PASSWORD_PENDING))(e)}
+          aria-busy={isSubmitting}
+          onSubmit={(e) => void handleSubmit(onValid)(e)}
         >
           <div>
             <h3 id="profile-password-title" className="text-sm font-semibold text-navy">
@@ -209,11 +183,11 @@ export function AccountSecurityCard() {
             />
           </Field>
 
-          <div className="flex flex-col gap-3 border-t border-line2 pt-4 sm:flex-row sm:items-center">
-            <p className="text-xs text-muted sm:mr-auto">
-              Backend integration isn’t available yet: submitting only validates the form.
-            </p>
-            <Button type="submit">Update password</Button>
+          <div className="flex justify-end border-t border-line2 pt-4">
+            <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+              {isSubmitting && <Spinner />}
+              {isSubmitting ? 'Updating…' : 'Update password'}
+            </Button>
           </div>
 
           <AuthNotice notice={passwordNotice} />
