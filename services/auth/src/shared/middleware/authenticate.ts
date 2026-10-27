@@ -14,13 +14,7 @@ function readBearerToken(req: Request): string {
 }
 
 export interface AuthenticationGuards {
-  /**
-   * Requires a full-session access token (password + emailed code completed) issued under the account's
-   * current security version. The account row it loads for that check is attached to the request (see
-   * `authenticatedUser`), so later guards and handlers of the same request reuse it instead of re-reading it.
-   */
   requireAccess: RequestHandler;
-  /** Requires the challenge token sent with an emailed code. It opens /mfa/* only. */
   requireMfaToken: RequestHandler;
 }
 
@@ -39,24 +33,18 @@ export function createAuthenticationGuards(tokens: TokenService, users: UserServ
   };
 }
 
-/**
- * The signed-in account, as loaded and checked by `requireAccess` for this request. Only for code mounted
- * behind `requireAccess`; it is never carried across requests.
- */
 export function authenticatedUser(req: Request): User {
   const user = req.authUser;
   if (!user) throw new HttpError(401, 'Missing bearer token');
   return user;
 }
 
-/** Narrows `req.auth` in a handler mounted behind `requireAccess`. */
 export function accessClaims(req: Request): AccessTokenClaims {
   const auth = req.auth;
   if (auth?.typ !== 'access') throw new HttpError(401, 'Missing bearer token');
   return auth;
 }
 
-/** Narrows `req.auth` in a handler mounted behind `requireMfaToken`. */
 export function mfaClaims(req: Request): MfaTokenClaims {
   const auth = req.auth;
   if (auth?.typ !== 'mfa') throw new HttpError(401, 'Missing bearer token');
