@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { Disclaimer } from '@/components/Disclaimer';
 import { MemberDrawer } from '@/features/chamber/MemberDrawer';
-import { MobileNav, Sidebar } from './SideNav';
+import { MobileNav, Sidebar, WorkspaceBar } from './SideNav';
 import { Toast } from './Toast';
 import { TopBar } from './TopBar';
 
@@ -28,6 +28,9 @@ export function AppLayout() {
           id="main"
           className="min-w-0 flex-1 px-4 pt-6 pb-28 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12"
         >
+          <div className="mx-auto max-w-6xl">
+            <WorkspaceBar />
+          </div>
           <div key={pathname} className="mx-auto max-w-6xl animate-fade-in">
             <Outlet />
             <Disclaimer />
