@@ -24,12 +24,14 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 const config = loadConfigOrExit();
 const logger = createLogger(config.logLevel);
 const prisma = createPrismaClient(config.databaseUrl);
+const repositories = createPrismaRepositories(prisma);
 
 const app = createApp({
   config,
   logger,
-  services: createServices(config, createPrismaRepositories(prisma), new NylasEmailSender(config.email)),
+  services: createServices(config, repositories, new NylasEmailSender(config.email)),
   checkDatabase: createDatabaseHealthCheck(prisma),
+  rateLimitCounters: repositories.loginAttempts,
 });
 
 const server = app.listen(config.port, (error?: Error) => {

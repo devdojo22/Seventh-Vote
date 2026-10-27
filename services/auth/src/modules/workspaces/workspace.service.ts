@@ -68,7 +68,7 @@ export class WorkspaceService {
   async create(actorId: string, input: CreateWorkspaceInput, context: RequestContext): Promise<WorkspaceResponse> {
     const workspace = await this.deps.workspaces.create(input);
     if (!workspace) throw new HttpError(409, 'A workspace with this slug already exists');
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'workspace.created',
       userId: actorId,
       workspaceId: workspace.id,
@@ -112,7 +112,7 @@ export class WorkspaceService {
         if (isUniqueConstraintViolation(error)) throw new HttpError(409, 'The Principal changed meanwhile. Try again.');
         throw error;
       }
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'workspace.principal_transferred',
         userId: actorId,
         workspaceId,
@@ -175,7 +175,7 @@ export class WorkspaceService {
     await this.requireAffiliate(userId, workspaceId, 'The Principal always has every permission');
     const updated = await this.deps.memberships.setAffiliateDossierEdit(userId, workspaceId, canEditDossiers);
     if (!updated) throw new HttpError(404, 'Member not found');
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'membership.updated',
       userId: actorId,
       workspaceId,
@@ -193,7 +193,7 @@ export class WorkspaceService {
     if (!(await this.deps.memberships.removeAffiliate(userId, workspaceId, this.deps.now()))) {
       throw new HttpError(404, 'Member not found');
     }
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'membership.removed',
       userId: actorId,
       workspaceId,
@@ -217,7 +217,7 @@ export class WorkspaceService {
       voteQuorum: rules.quorum,
     });
     if (!workspace) throw new HttpError(404, 'Workspace not found');
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'workspace.settings_updated',
       userId: actorId,
       workspaceId,

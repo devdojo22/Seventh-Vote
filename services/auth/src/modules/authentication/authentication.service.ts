@@ -57,19 +57,23 @@ export class AuthenticationService {
 
 
   async login({ email, password, remember }: LoginInput, context: RequestContext): Promise<MfaChallengeResponse> {
-    const attemptKey = loginAttemptKey(email, context.ip);
+    const attemptKey = loginAttemptKey(email);
     const attempts = await this.deps.loginAttempts.count(attemptKey, this.deps.now(), ACCOUNT_CREDENTIAL_WINDOW_MS);
     if (attempts > ACCOUNT_CREDENTIAL_FAILURE_LIMIT) {
-      this.deps.audit.record(context, { action: 'auth.login_throttled', userId: null, meta: { email } });
+      await this.deps.audit.record(context, {
+        action: 'auth.login_throttled',
+        userId: null,
+        meta: { emailFingerprint: this.deps.audit.emailFingerprint(email) },
+      });
       throw new HttpError(429, TOO_MANY_REQUESTS_MESSAGE);
     }
     const user = await this.deps.users.findByEmail(email);
     const passwordMatches = await this.deps.passwords.verify(password, user?.passwordHash);
     if (!user || !passwordMatches) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.login_failed',
         userId: user?.id ?? null,
-        meta: { email },
+        ...(user ? {} : { meta: { emailFingerprint: this.deps.audit.emailFingerprint(email) } }),
       });
       throw new HttpError(401, 'Invalid email or password');
     }
@@ -85,7 +89,7 @@ export class AuthenticationService {
   async resendCode(claims: MfaTokenClaims, context: RequestContext): Promise<MfaChallengeResponse> {
     const user = await this.deps.users.findById(claims.sub);
     if (!user) throw new HttpError(401, 'Account not found');
-    this.assertSignInCurrent(user, claims, context);
+    await this.assertSignInCurrent(user, claims, context);
     const challengeId = await this.sendCode(user, claims.pur, context, {
       enforceCooldown: true,
       replaces: claims.cid,
@@ -97,7 +101,7 @@ export class AuthenticationService {
   async verifyCode(claims: MfaTokenClaims, code: string, context: RequestContext): Promise<IssuedSession> {
     const user = await this.deps.users.findByIdWithMemberships(claims.sub);
     if (!user) throw new HttpError(401, 'Account not found');
-    this.assertSignInCurrent(user, claims, context);
+    await this.assertSignInCurrent(user, claims, context);
 
     const result = await this.deps.otp.verify({
       userId: user.id,
@@ -106,7 +110,7 @@ export class AuthenticationService {
       code,
     });
     if (!result.ok) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.mfa_failed',
         userId: user.id,
         meta: { purpose: claims.pur, reason: result.reason },
@@ -117,12 +121,12 @@ export class AuthenticationService {
 
     if (user.emailVerifiedAt === null) {
       await this.deps.users.markEmailVerified(user.id, this.deps.now());
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.email_verified',
         userId: user.id,
       });
     }
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'auth.login',
       userId: user.id,
       workspaceId: user.memberships[0]?.workspaceId ?? null,
@@ -138,7 +142,7 @@ export class AuthenticationService {
   ): Promise<string | null> {
     try {
       const challengeId = await this.deps.otp.issue(user, purpose, context, options);
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.otp_sent',
         userId: user.id,
         meta: { purpose },
@@ -147,7 +151,7 @@ export class AuthenticationService {
     } catch (error) {
       if (error instanceof OtpSendCapError) return null;
       if (!(error instanceof OtpDeliveryError)) throw error;
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.otp_send_failed',
         userId: user.id,
         meta: { purpose },
@@ -157,9 +161,9 @@ export class AuthenticationService {
   }
 
 
-  private assertSignInCurrent(user: User, claims: MfaTokenClaims, context: RequestContext): void {
+  private async assertSignInCurrent(user: User, claims: MfaTokenClaims, context: RequestContext): Promise<void> {
     if (claims.sv === user.securityVersion) return;
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'auth.mfa_failed',
       userId: user.id,
       meta: { purpose: claims.pur, reason: 'stale-token' },

@@ -18,8 +18,9 @@ const tokenTypeSchema = z.object({ typ: z.string() });
 export class TokenService {
   constructor(private readonly config: JwtConfig) {}
 
-  signAccessToken({ userId, workspaceId, role, securityVersion }: AccessTokenInput): string {
-    return jwt.sign({ typ: 'access', mfa: true, wid: workspaceId, role, sv: securityVersion }, this.config.secret, {
+  signAccessToken({ userId, workspaceId, role, securityVersion, sessionId }: AccessTokenInput): string {
+    const claims = { typ: 'access', mfa: true, wid: workspaceId, role, sv: securityVersion, sid: sessionId };
+    return jwt.sign(claims, this.config.secret, {
       algorithm: ALGORITHM,
       issuer: this.config.issuer,
       audience: this.config.audience,
