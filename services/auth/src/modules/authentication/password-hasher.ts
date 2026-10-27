@@ -1,18 +1,13 @@
 import bcrypt from 'bcryptjs';
 
-/** Production cost factor. Tests pass a lower one to stay fast. */
-export const DEFAULT_BCRYPT_COST = 12;
+const BCRYPT_COST = 12;
 
 export class PasswordHasher {
   /** Computed eagerly (off the event loop) so the first unknown-email login is not slower than later ones. */
-  private readonly dummyHash: Promise<string>;
-
-  constructor(private readonly cost: number = DEFAULT_BCRYPT_COST) {
-    this.dummyHash = bcrypt.hash('timing-equaliser', cost);
-  }
+  private readonly dummyHash = bcrypt.hash('timing-equaliser', BCRYPT_COST);
 
   hash(password: string): Promise<string> {
-    return bcrypt.hash(password, this.cost);
+    return bcrypt.hash(password, BCRYPT_COST);
   }
 
   /**
