@@ -4,11 +4,6 @@ import type { AuthorizationGuards } from '../../shared/middleware/authorize.js';
 import type { RateLimiters } from '../../shared/middleware/rate-limit.js';
 import type { WorkspaceController } from './workspace.controller.js';
 
-/**
- * Mounted under /auth. Every route needs a full session, then authorization from the database:
- * /admin/* for super-admins only; /workspaces/:workspaceId/* for whoever holds `manageMembers` in that
- * workspace (its Principal, or a super-admin). Affiliates may only read the workspace settings.
- */
 export function createWorkspaceRouter(
   controller: WorkspaceController,
   authentication: AuthenticationGuards,
@@ -18,7 +13,6 @@ export function createWorkspaceRouter(
   const router = Router();
   const superAdmin = [authentication.requireAccess, authorization.requireSuperAdmin];
   const manager = [authentication.requireAccess, authorization.requireWorkspacePermission('manageMembers')];
-  // Every member may read the rules a rehearsal runs under; only the Principal (or a super-admin) changes them.
   const member = [authentication.requireAccess, authorization.requireWorkspaceMember];
   const configurer = [authentication.requireAccess, authorization.requireWorkspacePermission('configureWorkspace')];
 

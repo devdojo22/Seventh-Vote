@@ -19,11 +19,8 @@ export interface VoteRulesUpdate {
 
 export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
-  /** Replaces the vote rules of one workspace. Returns null when the workspace does not exist. */
   updateVoteRules(id: string, rules: VoteRulesUpdate): Promise<Workspace | null>;
-  /** Returns null when the slug is already taken. */
   create(workspace: NewWorkspace): Promise<Workspace | null>;
-  /** Every workspace with its current Principal and member count, oldest first. */
   listOverview(): Promise<WorkspaceOverview[]>;
 }
 
