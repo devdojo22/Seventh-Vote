@@ -16,17 +16,26 @@ interface PrepState {
   brief: PrepBrief | null;
   loadFromSession: (input: SessionInput) => void;
   build: (values: PrepValues) => void;
+  /** Forgets the signed-in user's prep form and brief (sign-out, expiry, another account signing in). */
+  reset: () => void;
+}
+
+function initialPrep(): Pick<PrepState, 'values' | 'sessionContext' | 'brief'> {
+  return {
+    values: {
+      memberId: useCouncilStore.getState().members[0]?.id ?? '',
+      category: SESSION_DEFAULTS.category,
+      ask: SESSION_DEFAULTS.ask,
+      pitch: SESSION_DEFAULTS.desc,
+    },
+    sessionContext: null,
+    brief: null,
+  };
 }
 
 export const usePrepStore = create<PrepState>()((set, get) => ({
-  values: {
-    memberId: useCouncilStore.getState().members[0]?.id ?? '',
-    category: SESSION_DEFAULTS.category,
-    ask: SESSION_DEFAULTS.ask,
-    pitch: SESSION_DEFAULTS.desc,
-  },
-  sessionContext: null,
-  brief: null,
+  ...initialPrep(),
+  reset: () => set(initialPrep()),
   loadFromSession: (input) =>
     set((state) => ({
       sessionContext: input,
