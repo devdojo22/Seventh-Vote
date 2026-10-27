@@ -8,6 +8,7 @@ import type { Services } from './dependencies.js';
 import { REQUEST_LOG_OPTIONS } from './infrastructure/logging/logger.js';
 import { createAuthenticationController } from './modules/authentication/authentication.controller.js';
 import { createAuthenticationRouter } from './modules/authentication/authentication.routes.js';
+import type { LoginAttemptRepository } from './modules/authentication/login-attempt.repository.js';
 import { createInvitationController } from './modules/invitations/invitation.controller.js';
 import { createInvitationRouter } from './modules/invitations/invitation.routes.js';
 import { createSessionController } from './modules/sessions/session.controller.js';
@@ -26,9 +27,10 @@ export interface AppDependencies {
   logger: Logger;
   services: Services;
   checkDatabase: () => Promise<void>;
+  rateLimitCounters: LoginAttemptRepository;
 }
 
-export function createApp({ config, logger, services, checkDatabase }: AppDependencies): Express {
+export function createApp({ config, logger, services, checkDatabase, rateLimitCounters }: AppDependencies): Express {
   const app = express();
   app.set('trust proxy', 1);
   app.use(helmet());
@@ -46,9 +48,9 @@ export function createApp({ config, logger, services, checkDatabase }: AppDepend
     }
   });
 
-  const guards = createAuthenticationGuards(services.tokens, services.users);
+  const guards = createAuthenticationGuards(services.tokens, services.users, services.sessions);
   const authorization = createAuthorizationGuards(services.workspaceAccess, services.audit);
-  const limiters = createRateLimiters();
+  const limiters = createRateLimiters(rateLimitCounters);
   app.use(
     '/auth',
     createAuthenticationRouter(

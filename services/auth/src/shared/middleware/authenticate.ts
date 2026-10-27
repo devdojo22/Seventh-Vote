@@ -1,5 +1,6 @@
 import type { User } from '@prisma/client';
 import type { Request, RequestHandler } from 'express';
+import type { SessionService } from '../../modules/sessions/session.service.js';
 import type { TokenService } from '../../modules/tokens/token.service.js';
 import type { UserService } from '../../modules/users/user.service.js';
 import type { AccessTokenClaims, MfaTokenClaims } from '../../modules/tokens/token.types.js';
@@ -18,11 +19,19 @@ export interface AuthenticationGuards {
   requireMfaToken: RequestHandler;
 }
 
-export function createAuthenticationGuards(tokens: TokenService, users: UserService): AuthenticationGuards {
+export function createAuthenticationGuards(
+  tokens: TokenService,
+  users: UserService,
+  sessions: SessionService,
+): AuthenticationGuards {
   return {
     requireAccess: async (req, _res, next) => {
       const claims = tokens.verifyAccessToken(readBearerToken(req));
-      req.authUser = await users.assertTokenCurrent(claims);
+      const user = await users.assertTokenCurrent(claims);
+      // Logout, removal from the session's workspace and refresh-token theft end the session; its access
+      // tokens stop working at once instead of at expiry.
+      if (!(await sessions.isSessionLive(claims.sid, user.id))) throw new HttpError(401, 'Invalid or expired token');
+      req.authUser = user;
       req.auth = claims;
       next();
     },

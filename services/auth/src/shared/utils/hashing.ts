@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 
 /** 384 bits of entropy, URL-safe. Used for opaque refresh tokens. */
 export function randomToken(): string {
@@ -8,4 +8,9 @@ export function randomToken(): string {
 /** Opaque tokens are stored only as their SHA-256 digest. */
 export function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+/** Keyed digest for values that must be comparable but not recoverable by guessing (e.g. email addresses). */
+export function hmacSha256(key: string, value: string): string {
+  return createHmac('sha256', key).update(value).digest('hex');
 }

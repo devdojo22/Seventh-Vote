@@ -29,7 +29,7 @@ export function createAuthorizationGuards(access: WorkspaceAccessService, audit:
         throw new HttpError(403, 'You do not have permission to do this in this workspace');
       }
       if (granted.crossWorkspace) {
-        audit.record(requestContext(req), {
+        await audit.record(requestContext(req), {
           action: 'admin.workspace_access',
           userId: sub,
           workspaceId: granted.workspaceId,

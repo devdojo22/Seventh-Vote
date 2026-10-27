@@ -11,6 +11,8 @@ export const accessTokenClaimsSchema = z.object({
   wid: z.string().uuid().nullable(),
   role: z.nativeEnum(Role).nullable(),
   sv: securityVersionClaim,
+  /** Sign-in session (refresh_tokens.session_id); the token is rejected once that session has ended. */
+  sid: z.string().uuid(),
 });
 
 
@@ -33,6 +35,7 @@ export interface AccessTokenInput {
   workspaceId: string | null;
   role: Role | null;
   securityVersion: number;
+  sessionId: string;
 }
 
 export interface MfaTokenInput {

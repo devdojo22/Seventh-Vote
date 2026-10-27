@@ -66,7 +66,7 @@ export interface Services {
 export function createServices(config: AppConfig, repositories: Repositories, emailSender: EmailSender): Services {
   const now = () => new Date();
   const tokens = new TokenService(config.jwt);
-  const audit = new AuditService(repositories.audit);
+  const audit = new AuditService(repositories.audit, config.otpHmacKey);
   const passwords = new PasswordHasher();
   const sessions = new SessionService({
     refreshTokens: repositories.refreshTokens,

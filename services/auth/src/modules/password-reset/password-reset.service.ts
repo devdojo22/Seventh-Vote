@@ -41,10 +41,10 @@ export class PasswordResetService {
   async requestReset(email: string, context: RequestContext): Promise<void> {
     const user = await this.deps.users.findByEmail(email);
     if (!user) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.password_reset_requested',
         userId: null,
-        meta: { email },
+        meta: { emailFingerprint: this.deps.audit.emailFingerprint(email) },
       });
       return;
     }
@@ -61,14 +61,14 @@ export class PasswordResetService {
       },
     );
     if (!created) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.password_reset_requested',
         userId: user.id,
         meta: { throttled: true },
       });
       return;
     }
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'auth.password_reset_requested',
       userId: user.id,
     });
@@ -88,7 +88,7 @@ export class PasswordResetService {
         { userId: user.id, delivery: describeDeliveryError(error) },
         'password reset email could not be sent',
       );
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.password_reset_email_failed',
         userId: user.id,
       });
@@ -99,7 +99,7 @@ export class PasswordResetService {
     const record = await this.deps.resets.findByHash(sha256(token));
     const now = this.deps.now();
     if (record?.usedAt !== null || record.expiresAt <= now) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.password_reset_failed',
         userId: record?.userId ?? null,
       });
@@ -114,20 +114,20 @@ export class PasswordResetService {
       now,
     });
     if (!completed) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.password_reset_failed',
         userId: record.userId,
       });
       throw new HttpError(400, INVALID_RESET_LINK);
     }
-    this.deps.audit.record(context, {
+    await this.deps.audit.record(context, {
       action: 'auth.password_reset',
       userId: record.userId,
     });
 
     const user = await this.deps.users.findById(record.userId);
     if (!user) return;
-    await this.deps.loginAttempts.clear(loginAttemptKey(user.email, context.ip));
+    await this.deps.loginAttempts.clear(loginAttemptKey(user.email));
     void this.notifyPasswordChanged(user.id, user.email, now, context);
   }
 
@@ -144,7 +144,7 @@ export class PasswordResetService {
     }
 
     if (!(await this.deps.passwords.verify(currentPassword, user.passwordHash))) {
-      this.deps.audit.record(context, {
+      await this.deps.audit.record(context, {
         action: 'auth.password_change_failed',
         userId: user.id,
         workspaceId: claims.wid,
@@ -166,7 +166,7 @@ export class PasswordResetService {
     if (result.status === 'conflict') {
       throw new HttpError(409, 'Your password was changed by another request. Sign in again.');
     }
-    this.deps.audit.record(context, { action: 'auth.password_changed', userId: user.id, workspaceId: claims.wid });
+    await this.deps.audit.record(context, { action: 'auth.password_changed', userId: user.id, workspaceId: claims.wid });
 
     const session = await this.deps.sessions.issueInWorkspace(
       user.id,
