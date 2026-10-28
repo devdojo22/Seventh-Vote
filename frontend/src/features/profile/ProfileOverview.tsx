@@ -1,9 +1,11 @@
 import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { MailIcon } from '@/components/ui/icons';
+import { MailIcon, SignOutIcon } from '@/components/ui/icons';
 import { EmailStatusBadge, RoleBadge, SuperAdminBadge } from '@/features/access/AccessBadges';
 import { formatDate } from '@/features/access/access-labels';
 import { displayName, type CurrentUser } from '@/features/auth/auth-api';
+import { useSignOut } from '@/features/auth/use-sign-out';
 import { ROLES, type Role } from '@/types/access';
 
 function distinctRoles(user: CurrentUser): Role[] {
@@ -12,6 +14,7 @@ function distinctRoles(user: CurrentUser): Role[] {
 
 export function ProfileOverview({ user }: { user: CurrentUser }) {
   const name = displayName(user);
+  const { signingOut, handleSignOut } = useSignOut();
   return (
     <Card className="flex flex-col gap-5 sm:flex-row sm:items-center">
       <Avatar name={name} size="lg" />
@@ -32,6 +35,15 @@ export function ProfileOverview({ user }: { user: CurrentUser }) {
           </span>
         </div>
       </div>
+      <Button
+        variant="secondary"
+        onClick={() => void handleSignOut()}
+        disabled={signingOut}
+        className="shrink-0 hover:border-brick/30 hover:bg-brick-bg hover:text-brick sm:self-start"
+      >
+        <SignOutIcon className="size-[18px]" />
+        {signingOut ? 'Signing out…' : 'Sign out'}
+      </Button>
     </Card>
   );
 }

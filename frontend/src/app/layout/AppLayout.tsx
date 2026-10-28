@@ -22,7 +22,7 @@ export function AppLayout() {
         Skip to content
       </a>
       <TopBar />
-      <div className="mx-auto flex w-full max-w-[1380px] flex-1">
+      <div className="flex w-full flex-1">
         <Sidebar />
         <main
           id="main"

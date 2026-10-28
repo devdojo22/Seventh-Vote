@@ -30,7 +30,12 @@ import {
 } from './auth-api';
 import { describeInvitationError, INVITATION_INVALID_NOTICE } from './auth-errors';
 import { acceptInvitationSchema, type AcceptInvitationValues } from './auth-schema';
-import { isSessionRejected, reloadCurrentUser, withAccessToken } from './auth-session';
+import {
+  changeWorkspace,
+  isSessionRejected,
+  reloadCurrentUser,
+  withAccessToken,
+} from './auth-session';
 import { readLinkToken } from './link-token';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import type { InvitationAcceptedState, ReturnToState } from './return-to';
@@ -206,9 +211,12 @@ function JoinExistingAccount({ token, preview }: { token: string; preview: Invit
     setJoining(true);
     setNotice(null);
     try {
-      await withAccessToken((accessToken) => joinInvitation(accessToken, token));
+      const { workspaceId } = await withAccessToken((accessToken) =>
+        joinInvitation(accessToken, token),
+      );
       clearToken();
-      await reloadCurrentUser();
+      
+      await changeWorkspace(workspaceId).catch(() => reloadCurrentUser());
       void navigate('/', { replace: true });
     } catch (error) {
       if (isSessionRejected(error)) {
