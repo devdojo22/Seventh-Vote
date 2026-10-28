@@ -1,6 +1,7 @@
 import { Navigate, type RouteObject } from 'react-router';
 import { AdminWorkspacesPage } from '@/features/access/AdminWorkspacesPage';
 import { MembersPage } from '@/features/access/MembersPage';
+import { RequireWorkspace } from '@/features/access/RequireWorkspace';
 import { WorkspaceSettingsPage } from '@/features/access/WorkspaceSettingsPage';
 import { AcceptInvitationPage } from '@/features/auth/AcceptInvitationPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
@@ -48,21 +49,26 @@ export const routes: RouteObject[] = [
           {
             element: <AppLayout />,
             children: [
-              { index: true, element: <ChamberPage />, handle: page('Home') },
-              { path: 'session', element: <SessionPage />, handle: page('Council Session') },
-              { path: 'prep', element: <PrepPage />, handle: page('1-on-1 Prep') },
-              { path: 'method', element: <MethodologyPage />, handle: page('Methodology') },
+              {
+                element: <RequireWorkspace />,
+                children: [
+                  { index: true, element: <ChamberPage />, handle: page('Home') },
+                  { path: 'session', element: <SessionPage />, handle: page('Council Session') },
+                  { path: 'prep', element: <PrepPage />, handle: page('1-on-1 Prep') },
+                  { path: 'method', element: <MethodologyPage />, handle: page('Methodology') },
+                  {
+                    path: 'workspaces/:workspaceId/members',
+                    element: <MembersPage />,
+                    handle: page('Members'),
+                  },
+                  {
+                    path: 'workspaces/:workspaceId/settings',
+                    element: <WorkspaceSettingsPage />,
+                    handle: page('Vote rules'),
+                  },
+                ],
+              },
               { path: 'profile', element: <ProfilePage />, handle: page('Profile') },
-              {
-                path: 'workspaces/:workspaceId/members',
-                element: <MembersPage />,
-                handle: page('Members'),
-              },
-              {
-                path: 'workspaces/:workspaceId/settings',
-                element: <WorkspaceSettingsPage />,
-                handle: page('Vote rules'),
-              },
               {
                 path: 'admin/workspaces',
                 element: <AdminWorkspacesPage />,

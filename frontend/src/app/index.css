@@ -22,6 +22,9 @@
   --font-display: 'Palanquin', 'Montserrat', system-ui, -apple-system, sans-serif;
   --font-sans: 'Montserrat', 'Palanquin', system-ui, -apple-system, sans-serif;
 
+  --spacing-sidebar: 16rem;
+  --spacing-sidebar-collapsed: 5rem;
+
   --shadow-card: 0 1px 2px rgb(13 36 56 / 0.04), 0 2px 8px -2px rgb(13 36 56 / 0.06);
   --shadow-elevated: 0 18px 40px -16px rgb(13 36 56 / 0.28);
 
