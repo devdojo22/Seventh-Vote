@@ -8,6 +8,7 @@ import { manageableInvitationRoles } from './workspace-permissions.js';
 import type { WorkspaceService } from './workspace.service.js';
 import {
   createWorkspaceSchema,
+  deleteWorkspaceSchema,
   designatePrincipalSchema,
   idParamSchema,
   inviteAffiliateSchema,
@@ -19,6 +20,9 @@ export interface WorkspaceController {
   create: RequestHandler;
   listAll: RequestHandler;
   designatePrincipal: RequestHandler;
+  archive: RequestHandler;
+  restore: RequestHandler;
+  deletePermanently: RequestHandler;
   listMembers: RequestHandler;
   inviteAffiliate: RequestHandler;
   listInvitations: RequestHandler;
@@ -48,14 +52,35 @@ export function createWorkspaceController(workspaces: WorkspaceService): Workspa
     },
 
     designatePrincipal: async (req: Request, res: Response) => {
-      const { email } = parseBody(designatePrincipalSchema, req.body);
+      const input = parseBody(designatePrincipalSchema, req.body);
       const result = await workspaces.designatePrincipal(
         accessClaims(req).sub,
         idParam(req, 'workspaceId'),
-        email,
+        input,
         requestContext(req),
       );
       res.status(result.status === 'invited' ? 202 : 200).json(result);
+    },
+
+    archive: async (req: Request, res: Response) => {
+      await workspaces.archive(accessClaims(req).sub, idParam(req, 'workspaceId'), requestContext(req));
+      res.status(204).end();
+    },
+
+    restore: async (req: Request, res: Response) => {
+      await workspaces.restore(accessClaims(req).sub, idParam(req, 'workspaceId'), requestContext(req));
+      res.status(204).end();
+    },
+
+    deletePermanently: async (req: Request, res: Response) => {
+      const { confirmSlug } = parseBody(deleteWorkspaceSchema, req.body);
+      await workspaces.deletePermanently(
+        accessClaims(req).sub,
+        idParam(req, 'workspaceId'),
+        confirmSlug,
+        requestContext(req),
+      );
+      res.status(204).end();
     },
 
     listMembers: async (req: Request, res: Response) => {

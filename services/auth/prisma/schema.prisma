@@ -17,6 +17,13 @@ enum Role {
   AFFILIATE
 }
 
+/// What a Principal transfer does with the previous Principal, chosen explicitly by the super-admin.
+/// REMOVE (the default): their membership in that workspace ends. KEEP_AS_AFFILIATE: they stay as an Affiliate.
+enum PreviousPrincipalOutcome {
+  REMOVE
+  KEEP_AS_AFFILIATE
+}
+
 /// A login identity. One user can belong to many workspaces via Membership.
 model User {
   id                String    @id @default(uuid()) @db.Uuid
@@ -28,6 +35,7 @@ model User {
   passwordHash      String    @map("password_hash")
   /// First time the user entered a code emailed to `email`; null until then.
   emailVerifiedAt   DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  /// Platform operator. Never also a workspace member: triggers on users and memberships (migration 0015).
   isSuperAdmin      Boolean   @default(false) @map("is_super_admin")
   /// True only for accounts created by the retired public self-registration. Historical marker: nothing
   /// reads it at runtime any more (migration 0009 used it to demote self-registered Principals).
@@ -54,17 +62,19 @@ model User {
 /// Vote rules are set by the workspace's Principal; all three are NULL until configured, and a CHECK
 /// constraint (migration 0010) keeps them all-or-nothing and within the body size.
 model Workspace {
-  id                    String   @id @default(uuid()) @db.Uuid
+  id                    String    @id @default(uuid()) @db.Uuid
   name                  String
-  slug                  String   @unique
+  slug                  String    @unique
   /// Number of voting seats.
-  voteBodySize          Int?     @map("vote_body_size")
+  voteBodySize          Int?      @map("vote_body_size")
   /// Votes needed for an ordinary item to pass.
-  voteMajorityThreshold Int?     @map("vote_majority_threshold")
+  voteMajorityThreshold Int?      @map("vote_majority_threshold")
   /// Members who must be present for business.
-  voteQuorum            Int?     @map("vote_quorum")
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  voteQuorum            Int?      @map("vote_quorum")
+  /// Set by a super-admin to freeze the workspace: members lose access, nothing is removed. Cleared on restore.
+  archivedAt            DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   memberships   Membership[]
   refreshTokens RefreshToken[]
@@ -77,6 +87,8 @@ model Workspace {
 /// Links a user to a workspace with a role. One row per (user, workspace).
 /// At most one PRINCIPAL per workspace: enforced by the partial unique index
 /// "memberships_one_principal_per_workspace" (migration 0009, raw SQL; Prisma cannot express it).
+/// A workspace that has a Principal is never left without one: deferred trigger "memberships_keep_principal",
+/// and a super-admin never holds a membership: trigger "memberships_reject_super_admin" (both migration 0015).
 model Membership {
   id              String   @id @default(uuid()) @db.Uuid
   userId          String   @map("user_id") @db.Uuid
@@ -148,21 +160,24 @@ model PasswordResetToken {
 /// Single-use invitation into a workspace: the only way an account gains a membership. Only the SHA-256 of
 /// the emailed token is stored. A PRINCIPAL invitation is created only by a super-admin.
 model Invitation {
-  id              String    @id @default(uuid()) @db.Uuid
-  workspaceId     String    @map("workspace_id") @db.Uuid
+  id                       String                    @id @default(uuid()) @db.Uuid
+  workspaceId              String                    @map("workspace_id") @db.Uuid
   /// Lowercased; the account that accepts must have this address.
-  email           String
-  role            Role
-  canEditDossiers Boolean   @default(false) @map("can_edit_dossiers")
-  tokenHash       String    @unique @map("token_hash")
-  invitedById     String?   @map("invited_by_id") @db.Uuid
+  email                    String
+  role                     Role
+  canEditDossiers          Boolean                   @default(false) @map("can_edit_dossiers")
+  /// PRINCIPAL invitations only (CHECK, migration 0015): applied to the previous Principal on acceptance.
+  /// NULL means REMOVE.
+  previousPrincipalOutcome PreviousPrincipalOutcome? @map("previous_principal_outcome")
+  tokenHash                String                    @unique @map("token_hash")
+  invitedById              String?                   @map("invited_by_id") @db.Uuid
   /// When the provider accepted the invitation email. Null: not (yet) sent, so it cannot be previewed,
   /// listed or accepted, and it has not superseded anything.
-  sentAt          DateTime? @map("sent_at") @db.Timestamptz(6)
-  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
-  acceptedAt      DateTime? @map("accepted_at") @db.Timestamptz(6)
-  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  sentAt                   DateTime?                 @map("sent_at") @db.Timestamptz(6)
+  expiresAt                DateTime                  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt               DateTime?                 @map("accepted_at") @db.Timestamptz(6)
+  revokedAt                DateTime?                 @map("revoked_at") @db.Timestamptz(6)
+  createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   invitedBy User?     @relation("InvitationsSent", fields: [invitedById], references: [id], onDelete: SetNull)

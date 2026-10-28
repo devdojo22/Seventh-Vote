@@ -1,4 +1,13 @@
-import { Role, type Membership, type Prisma, type PrismaClient, type User, type Workspace } from '@prisma/client';
+import {
+  PreviousPrincipalOutcome,
+  Role,
+  type Membership,
+  type Prisma,
+  type PrismaClient,
+  type User,
+  type Workspace,
+} from '@prisma/client';
+import { lockWorkspace } from './workspace.repository.js';
 
 /** The part of a membership that scopes a session: which workspace, with which role. */
 export type MembershipScope = Pick<Membership, 'workspaceId' | 'role'>;
@@ -6,17 +15,27 @@ export type MembershipScope = Pick<Membership, 'workspaceId' | 'role'>;
 export type MembershipWithUser = Membership & { user: User };
 export type MembershipWithWorkspace = Membership & { workspace: Workspace };
 
+const IN_ACTIVE_WORKSPACE = { workspace: { archivedAt: null } } satisfies Prisma.MembershipWhereInput;
+
 export interface GrantedMembership {
   userId: string;
   workspaceId: string;
   role: Role;
   canEditDossiers: boolean;
+  previousPrincipal: PreviousPrincipalOutcome;
   now: Date;
 }
 
 export interface PrincipalChange {
   previousPrincipalId: string | null;
+  previousPrincipalOutcome: PreviousPrincipalOutcome | null;
 }
+
+export type TransferResult =
+  | ({ status: 'transferred' } & PrincipalChange)
+  | { status: 'workspace-unavailable' }
+  | { status: 'not-member' }
+  | { status: 'already-principal' };
 
 async function revokeWorkspaceSessions(
   tx: Prisma.TransactionClient,
@@ -31,8 +50,9 @@ async function revokeWorkspaceSessions(
   });
 }
 
+
 export async function grantMembership(tx: Prisma.TransactionClient, grant: GrantedMembership): Promise<PrincipalChange> {
-  const { userId, workspaceId, role, canEditDossiers, now } = grant;
+  const { userId, workspaceId, role, canEditDossiers, previousPrincipal, now } = grant;
   if (role === Role.AFFILIATE) {
     await tx.membership.upsert({
       where: { userId_workspaceId: { userId, workspaceId } },
@@ -45,7 +65,7 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
         data: { canEditDossiers: true },
       });
     }
-    return { previousPrincipalId: null };
+    return { previousPrincipalId: null, previousPrincipalOutcome: null };
   }
 
   await tx.invitation.updateMany({
@@ -56,10 +76,14 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
     where: { workspaceId, role: Role.PRINCIPAL, userId: { not: userId } },
   });
   if (previous) {
-    await tx.membership.update({
-      where: { id: previous.id },
-      data: { role: Role.AFFILIATE, canEditDossiers: false },
-    });
+    if (previousPrincipal === PreviousPrincipalOutcome.KEEP_AS_AFFILIATE) {
+      await tx.membership.update({
+        where: { id: previous.id },
+        data: { role: Role.AFFILIATE, canEditDossiers: false },
+      });
+    } else {
+      await tx.membership.delete({ where: { id: previous.id } });
+    }
     await revokeWorkspaceSessions(tx, [previous.userId], workspaceId, now);
   }
   await tx.membership.upsert({
@@ -67,15 +91,25 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
     update: { role: Role.PRINCIPAL },
     create: { userId, workspaceId, role: Role.PRINCIPAL },
   });
-  return { previousPrincipalId: previous?.userId ?? null };
+  return previous
+    ? { previousPrincipalId: previous.userId, previousPrincipalOutcome: previousPrincipal }
+    : { previousPrincipalId: null, previousPrincipalOutcome: null };
 }
 
 export interface MembershipRepository {
   find(userId: string, workspaceId: string): Promise<Membership | null>;
+  /** The membership only while its workspace is not archived: the lookup every access decision uses. */
+  findActive(userId: string, workspaceId: string): Promise<Membership | null>;
   findWithUser(userId: string, workspaceId: string): Promise<MembershipWithUser | null>;
-  listForUser(userId: string): Promise<MembershipWithWorkspace[]>;
+  /** The user's memberships in workspaces that are not archived. */
+  listActiveForUser(userId: string): Promise<MembershipWithWorkspace[]>;
   listForWorkspace(workspaceId: string): Promise<MembershipWithUser[]>;
-  transferPrincipal(userId: string, workspaceId: string, now: Date): Promise<PrincipalChange>;
+  transferPrincipal(
+    userId: string,
+    workspaceId: string,
+    previousPrincipal: PreviousPrincipalOutcome,
+    now: Date,
+  ): Promise<TransferResult>;
   setAffiliateDossierEdit(userId: string, workspaceId: string, canEditDossiers: boolean): Promise<MembershipWithUser | null>;
   removeAffiliate(userId: string, workspaceId: string, now: Date): Promise<boolean>;
 }
@@ -87,6 +121,10 @@ export class PrismaMembershipRepository implements MembershipRepository {
     return this.prisma.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
   }
 
+  findActive(userId: string, workspaceId: string): Promise<Membership | null> {
+    return this.prisma.membership.findFirst({ where: { userId, workspaceId, ...IN_ACTIVE_WORKSPACE } });
+  }
+
   findWithUser(userId: string, workspaceId: string): Promise<MembershipWithUser | null> {
     return this.prisma.membership.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
@@ -94,9 +132,9 @@ export class PrismaMembershipRepository implements MembershipRepository {
     });
   }
 
-  listForUser(userId: string): Promise<MembershipWithWorkspace[]> {
+  listActiveForUser(userId: string): Promise<MembershipWithWorkspace[]> {
     return this.prisma.membership.findMany({
-      where: { userId },
+      where: { userId, ...IN_ACTIVE_WORKSPACE },
       include: { workspace: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -110,10 +148,31 @@ export class PrismaMembershipRepository implements MembershipRepository {
     });
   }
 
-  transferPrincipal(userId: string, workspaceId: string, now: Date): Promise<PrincipalChange> {
-    return this.prisma.$transaction((tx) =>
-      grantMembership(tx, { userId, workspaceId, role: Role.PRINCIPAL, canEditDossiers: false, now }),
-    );
+  /** Promotes an existing member. State is re-read under the workspace lock, so concurrent transfers serialize. */
+  transferPrincipal(
+    userId: string,
+    workspaceId: string,
+    previousPrincipal: PreviousPrincipalOutcome,
+    now: Date,
+  ): Promise<TransferResult> {
+    return this.prisma.$transaction(async (tx): Promise<TransferResult> => {
+      await lockWorkspace(tx, workspaceId);
+      const workspace = await tx.workspace.findUnique({ where: { id: workspaceId } });
+      // Missing (undefined) or archived (a date): only an active workspace has archivedAt === null.
+      if (workspace?.archivedAt !== null) return { status: 'workspace-unavailable' };
+      const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
+      if (!membership) return { status: 'not-member' };
+      if (membership.role === Role.PRINCIPAL) return { status: 'already-principal' };
+      const change = await grantMembership(tx, {
+        userId,
+        workspaceId,
+        role: Role.PRINCIPAL,
+        canEditDossiers: false,
+        previousPrincipal,
+        now,
+      });
+      return { status: 'transferred', ...change };
+    });
   }
 
   async setAffiliateDossierEdit(

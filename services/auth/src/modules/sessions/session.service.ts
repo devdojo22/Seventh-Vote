@@ -68,7 +68,8 @@ export class SessionService {
     securityVersion: number,
     sessionId?: string,
   ): Promise<IssuedSession> {
-    const membership = workspaceId === null ? null : await this.deps.memberships.find(userId, workspaceId);
+    // Removed from, or archived: the session continues with no active workspace.
+    const membership = workspaceId === null ? null : await this.deps.memberships.findActive(userId, workspaceId);
     return this.issue(userId, membership, persistent, securityVersion, sessionId);
   }
 
@@ -130,8 +131,8 @@ export class SessionService {
     context: RequestContext,
   ): Promise<IssuedSession> {
     if (rawToken === undefined) throw new HttpError(401, 'No session');
-    const membership = await this.deps.memberships.find(userId, workspaceId);
-    if (!membership) throw new HttpError(403, 'Not a member of that workspace');
+    const membership = await this.deps.memberships.findActive(userId, workspaceId);
+    if (!membership) throw new HttpError(403, 'Not a member of that workspace, or it is archived');
     const revoked = await this.deps.refreshTokens.revokeForUser(sha256(rawToken), userId, this.now());
     if (!revoked) throw new HttpError(401, 'Session expired');
     const session = await this.issue(

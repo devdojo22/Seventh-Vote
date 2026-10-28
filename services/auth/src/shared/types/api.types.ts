@@ -70,6 +70,7 @@ export interface WorkspaceResponse {
   id: string;
   name: string;
   slug: string;
+  archivedAt: string | null;
   createdAt: string;
 }
 

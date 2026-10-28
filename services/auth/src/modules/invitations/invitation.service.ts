@@ -1,4 +1,4 @@
-import { Role, type Invitation, type User, type Workspace } from '@prisma/client';
+import { Role, type Invitation, type PreviousPrincipalOutcome, type User, type Workspace } from '@prisma/client';
 import { describeDeliveryError, type EmailSender } from '../../infrastructure/email/email-sender.js';
 import { HttpError } from '../../shared/errors/http-error.js';
 import { isUniqueConstraintViolation } from '../../shared/errors/prisma-errors.js';
@@ -11,6 +11,7 @@ import { randomToken, sha256 } from '../../shared/utils/hashing.js';
 import type { AuditService, RequestContext } from '../audit/audit.service.js';
 import type { PasswordHasher } from '../authentication/password-hasher.js';
 import type { UserRepository } from '../users/user.repository.js';
+import { WORKSPACE_ARCHIVED } from '../workspaces/workspace-access.service.js';
 import { invitationEmail } from './invitation-emails.js';
 import type { AcceptResult, InvitationRepository, InvitationWithWorkspace } from './invitation.repository.js';
 import type { AcceptInvitationInput } from './invitation.validation.js';
@@ -18,6 +19,8 @@ import type { AcceptInvitationInput } from './invitation.validation.js';
 const INVALID_INVITATION = 'This invitation link is invalid or has expired. Ask for a new invitation.';
 const ACCOUNT_EXISTS = 'An account already exists for this email address. Sign in to accept the invitation.';
 const EMAIL_MISMATCH = 'This invitation was sent to a different email address.';
+const SUPER_ADMIN_NO_WORKSPACE_ROLE =
+  'Platform administrator accounts cannot hold a workspace role. Use a separate account for workspace work.';
 const MS_PER_HOUR = 60 * 60 * 1000;
 
 export interface InvitationServiceDependencies {
@@ -37,6 +40,8 @@ export interface NewInvitationRequest {
   email: string;
   role: Role;
   canEditDossiers: boolean;
+  /** PRINCIPAL invitations only: applied to the current Principal when the invitation is accepted. */
+  previousPrincipalOutcome: PreviousPrincipalOutcome | null;
   invitedById: string;
 }
 
@@ -59,7 +64,11 @@ export function toInvitationResponse(invitation: Invitation): InvitationResponse
 export class InvitationService {
   constructor(private readonly deps: InvitationServiceDependencies) {}
   async invite(request: NewInvitationRequest, context: RequestContext): Promise<InvitationResponse> {
-    const { workspace, email, role, canEditDossiers, invitedById } = request;
+    const { workspace, email, role, canEditDossiers, previousPrincipalOutcome, invitedById } = request;
+    if (workspace.archivedAt !== null) throw new HttpError(409, WORKSPACE_ARCHIVED);
+    if ((await this.deps.users.findByEmail(email))?.isSuperAdmin) {
+      throw new HttpError(409, SUPER_ADMIN_NO_WORKSPACE_ROLE);
+    }
     const token = randomToken();
     const now = this.deps.now();
     const invitation = await this.deps.invitations.create({
@@ -67,6 +76,7 @@ export class InvitationService {
       email,
       role,
       canEditDossiers,
+      previousPrincipalOutcome: role === Role.PRINCIPAL ? previousPrincipalOutcome : null,
       tokenHash: sha256(token),
       invitedById,
       expiresAt: new Date(now.getTime() + this.deps.ttlMs),
@@ -208,6 +218,7 @@ export class InvitationService {
   private async usable(token: string): Promise<InvitationWithWorkspace | null> {
     const invitation = await this.deps.invitations.findByHash(sha256(token));
     if (invitation?.acceptedAt !== null || invitation.revokedAt !== null || invitation.sentAt === null) return null;
+    if (invitation.workspace.archivedAt !== null) return null;
     return invitation.expiresAt > this.deps.now() ? invitation : null;
   }
 
@@ -224,6 +235,15 @@ export class InvitationService {
   ): Promise<InvitationAcceptedResponse> {
     if (result.status === 'account-exists') throw accountExists();
     if (result.status === 'invalid') return await this.reject(context, null, 'invalid');
+    if (result.status === 'ineligible') {
+      await this.deps.audit.record(context, {
+        action: 'invitation.accept_failed',
+        userId: null,
+        workspaceId: invitation.workspaceId,
+        meta: { invitationId: invitation.id, reason: 'super-admin' },
+      });
+      throw new HttpError(409, SUPER_ADMIN_NO_WORKSPACE_ROLE);
+    }
     await this.deps.audit.record(context, {
       action: 'invitation.accepted',
       userId: result.userId,
@@ -235,7 +255,11 @@ export class InvitationService {
         action: 'workspace.principal_transferred',
         userId: invitation.invitedById,
         workspaceId: result.workspaceId,
-        meta: { fromUserId: result.change.previousPrincipalId, toUserId: result.userId },
+        meta: {
+          fromUserId: result.change.previousPrincipalId,
+          toUserId: result.userId,
+          previousPrincipalOutcome: result.change.previousPrincipalOutcome,
+        },
       });
     }
     return { accepted: true, workspaceId: result.workspaceId };
