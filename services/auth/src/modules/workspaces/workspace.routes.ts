@@ -24,6 +24,9 @@ export function createWorkspaceRouter(
     limiters.invitationSendByAccount,
     controller.designatePrincipal,
   );
+  router.post('/admin/workspaces/:workspaceId/archive', ...superAdmin, controller.archive);
+  router.post('/admin/workspaces/:workspaceId/restore', ...superAdmin, controller.restore);
+  router.delete('/admin/workspaces/:workspaceId', ...superAdmin, controller.deletePermanently);
 
   router.get('/workspaces/:workspaceId/members', ...manager, controller.listMembers);
   router.patch('/workspaces/:workspaceId/members/:userId', ...manager, controller.updateMember);

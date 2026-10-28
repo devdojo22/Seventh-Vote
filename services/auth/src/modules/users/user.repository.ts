@@ -20,10 +20,11 @@ export class PrismaUserRepository implements UserRepository {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  /** With the memberships a session can be scoped to: those in workspaces that are not archived. */
   findByIdWithMemberships(id: string): Promise<UserWithMemberships | null> {
     return this.prisma.user.findUnique({
       where: { id },
-      include: { memberships: { orderBy: { createdAt: 'asc' } } },
+      include: { memberships: { where: { workspace: { archivedAt: null } }, orderBy: { createdAt: 'asc' } } },
     });
   }
 

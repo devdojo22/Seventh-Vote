@@ -44,12 +44,13 @@ export class UserService {
   }
 
   async getAccess(user: User, claims: AccessTokenClaims): Promise<AccessResponse> {
-    const active = claims.wid === null ? null : await this.deps.memberships.find(user.id, claims.wid);
+    // Archived workspaces grant nothing, here or in the Django API, which relies on this answer.
+    const active = claims.wid === null ? null : await this.deps.memberships.findActive(user.id, claims.wid);
     return accessIn(user, active);
   }
 
   async getProfile(user: User, claims: AccessTokenClaims): Promise<MeResponse> {
-    const memberships = await this.deps.memberships.listForUser(user.id);
+    const memberships = await this.deps.memberships.listActiveForUser(user.id);
     const active = memberships.find((membership) => membership.workspaceId === claims.wid) ?? null;
     return {
       ...accessIn(user, active),

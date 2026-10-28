@@ -13,9 +13,15 @@ import type { AuditService, RequestContext } from '../audit/audit.service.js';
 import type { InvitationService } from '../invitations/invitation.service.js';
 import type { UserRepository } from '../users/user.repository.js';
 import { displayName } from '../users/user.service.js';
-import type { MembershipRepository, MembershipWithUser } from './membership.repository.js';
-import type { CreateWorkspaceInput, InviteAffiliateInput, VoteRulesInput } from './workspace.validation.js';
-import type { WorkspaceRepository } from './workspace.repository.js';
+import type { MembershipRepository, MembershipWithUser, TransferResult } from './membership.repository.js';
+import { WORKSPACE_ARCHIVED } from './workspace-access.service.js';
+import type {
+  CreateWorkspaceInput,
+  DesignatePrincipalInput,
+  InviteAffiliateInput,
+  VoteRulesInput,
+} from './workspace.validation.js';
+import type { LifecycleResult, WorkspaceRepository } from './workspace.repository.js';
 
 export interface WorkspaceServiceDependencies {
   workspaces: WorkspaceRepository;
@@ -56,6 +62,7 @@ function toWorkspaceResponse(workspace: Workspace): WorkspaceResponse {
     id: workspace.id,
     name: workspace.name,
     slug: workspace.slug,
+    archivedAt: workspace.archivedAt?.toISOString() ?? null,
     createdAt: workspace.createdAt.toISOString(),
   };
 }
@@ -93,30 +100,45 @@ export class WorkspaceService {
   }
 
 
+
   async designatePrincipal(
     actorId: string,
     workspaceId: string,
-    email: string,
+    { email, previousPrincipal }: DesignatePrincipalInput,
     context: RequestContext,
   ): Promise<DesignatePrincipalResponse> {
     const workspace = await this.requireWorkspace(workspaceId);
+    if (workspace.archivedAt !== null) throw new HttpError(409, WORKSPACE_ARCHIVED);
     const user = await this.deps.users.findByEmail(email);
     const membership = user ? await this.deps.memberships.find(user.id, workspaceId) : null;
 
     if (user && membership) {
-      if (membership.role === Role.PRINCIPAL) throw new HttpError(409, 'This user is already the Principal');
-      let previousPrincipalId: string | null;
+      let result: TransferResult;
       try {
-        ({ previousPrincipalId } = await this.deps.memberships.transferPrincipal(user.id, workspaceId, this.deps.now()));
+        result = await this.deps.memberships.transferPrincipal(user.id, workspaceId, previousPrincipal, this.deps.now());
       } catch (error) {
         if (isUniqueConstraintViolation(error)) throw new HttpError(409, 'The Principal changed meanwhile. Try again.');
         throw error;
+      }
+      switch (result.status) {
+        case 'workspace-unavailable':
+          throw new HttpError(409, 'The workspace was archived or deleted meanwhile.');
+        case 'not-member':
+          throw new HttpError(409, 'This person left the workspace meanwhile. Try again.');
+        case 'already-principal':
+          throw new HttpError(409, 'This user is already the Principal');
+        case 'transferred':
+          break;
       }
       await this.deps.audit.record(context, {
         action: 'workspace.principal_transferred',
         userId: actorId,
         workspaceId,
-        meta: { fromUserId: previousPrincipalId, toUserId: user.id },
+        meta: {
+          fromUserId: result.previousPrincipalId,
+          toUserId: user.id,
+          previousPrincipalOutcome: result.previousPrincipalOutcome,
+        },
       });
       const principal = await this.deps.memberships.findWithUser(user.id, workspaceId);
       if (!principal) throw new HttpError(409, 'The membership changed meanwhile. Try again.');
@@ -124,10 +146,53 @@ export class WorkspaceService {
     }
 
     const invitation = await this.deps.invitations.invite(
-      { workspace, email, role: Role.PRINCIPAL, canEditDossiers: false, invitedById: actorId },
+      {
+        workspace,
+        email,
+        role: Role.PRINCIPAL,
+        canEditDossiers: false,
+        previousPrincipalOutcome: previousPrincipal,
+        invitedById: actorId,
+      },
       context,
     );
     return { status: 'invited', invitation };
+  }
+
+  async archive(actorId: string, workspaceId: string, context: RequestContext): Promise<void> {
+    const result = await this.deps.workspaces.archive(workspaceId, this.deps.now());
+    this.assertLifecycleChanged(result, 'This workspace is already archived');
+    await this.deps.audit.record(context, { action: 'workspace.archived', userId: actorId, workspaceId });
+  }
+
+  async restore(actorId: string, workspaceId: string, context: RequestContext): Promise<void> {
+    const result = await this.deps.workspaces.restore(workspaceId);
+    this.assertLifecycleChanged(result, 'This workspace is not archived');
+    await this.deps.audit.record(context, { action: 'workspace.restored', userId: actorId, workspaceId });
+  }
+
+  async deletePermanently(
+    actorId: string,
+    workspaceId: string,
+    confirmSlug: string,
+    context: RequestContext,
+  ): Promise<void> {
+    const result = await this.deps.workspaces.deletePermanently(
+      workspaceId,
+      confirmSlug,
+      { userId: actorId, ip: context.ip },
+      this.deps.now(),
+    );
+    switch (result) {
+      case 'not-found':
+        throw new HttpError(404, 'Workspace not found');
+      case 'not-archived':
+        throw new HttpError(409, 'Archive the workspace before deleting it permanently');
+      case 'confirmation-mismatch':
+        throw new HttpError(400, 'The confirmation does not match the workspace slug');
+      case 'deleted':
+        return;
+    }
   }
 
   async listMembers(workspaceId: string): Promise<MemberResponse[]> {
@@ -146,7 +211,14 @@ export class WorkspaceService {
       throw new HttpError(409, 'This person is already a member of the workspace');
     }
     return this.deps.invitations.invite(
-      { workspace, email: input.email, role: Role.AFFILIATE, canEditDossiers: input.canEditDossiers, invitedById: actorId },
+      {
+        workspace,
+        email: input.email,
+        role: Role.AFFILIATE,
+        canEditDossiers: input.canEditDossiers,
+        previousPrincipalOutcome: null,
+        invitedById: actorId,
+      },
       context,
     );
   }
@@ -230,6 +302,11 @@ export class WorkspaceService {
     const workspace = await this.deps.workspaces.findById(workspaceId);
     if (!workspace) throw new HttpError(404, 'Workspace not found');
     return workspace;
+  }
+
+  private assertLifecycleChanged(result: LifecycleResult, alreadyMessage: string): void {
+    if (result === 'not-found') throw new HttpError(404, 'Workspace not found');
+    if (result === 'already-in-state') throw new HttpError(409, alreadyMessage);
   }
 
   private async requireAffiliate(userId: string, workspaceId: string, principalMessage: string): Promise<void> {

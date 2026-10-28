@@ -1,5 +1,8 @@
-import { Role, type PrismaClient, type User, type Workspace } from '@prisma/client';
+import { Role, type Prisma, type PrismaClient, type User, type Workspace } from '@prisma/client';
 import { isUniqueConstraintViolation } from '../../shared/errors/prisma-errors.js';
+import { insertAuditEntry } from '../audit/audit.repository.js';
+
+const DELETE_TRANSACTION_TIMEOUT_MS = 60_000;
 
 export interface NewWorkspace {
   name: string;
@@ -17,11 +20,28 @@ export interface VoteRulesUpdate {
   voteQuorum: number;
 }
 
+export type LifecycleResult = 'done' | 'not-found' | 'already-in-state';
+
+export type DeletionResult = 'deleted' | 'not-found' | 'not-archived' | 'confirmation-mismatch';
+
+export interface DeletionActor {
+  userId: string;
+  ip: string | null;
+}
+
+
+export async function lockWorkspace(tx: Prisma.TransactionClient, workspaceId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`workspace:${workspaceId}`}))`;
+}
+
 export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
   updateVoteRules(id: string, rules: VoteRulesUpdate): Promise<Workspace | null>;
   create(workspace: NewWorkspace): Promise<Workspace | null>;
   listOverview(): Promise<WorkspaceOverview[]>;
+  archive(id: string, now: Date): Promise<LifecycleResult>;
+  restore(id: string): Promise<LifecycleResult>;
+  deletePermanently(id: string, confirmSlug: string, actor: DeletionActor, now: Date): Promise<DeletionResult>;
 }
 
 export class PrismaWorkspaceRepository implements WorkspaceRepository {
@@ -58,5 +78,52 @@ export class PrismaWorkspaceRepository implements WorkspaceRepository {
       principal: memberships[0]?.user ?? null,
       memberCount: _count.memberships,
     }));
+  }
+
+  archive(id: string, now: Date): Promise<LifecycleResult> {
+    return this.setArchivedAt(id, now);
+  }
+
+  restore(id: string): Promise<LifecycleResult> {
+    return this.setArchivedAt(id, null);
+  }
+
+ 
+  deletePermanently(id: string, confirmSlug: string, actor: DeletionActor, now: Date): Promise<DeletionResult> {
+    return this.prisma.$transaction(
+      async (tx): Promise<DeletionResult> => {
+        await lockWorkspace(tx, id);
+        const workspace = await tx.workspace.findUnique({ where: { id } });
+        if (!workspace) return 'not-found';
+        if (workspace.archivedAt === null) return 'not-archived';
+        if (workspace.slug !== confirmSlug) return 'confirmation-mismatch';
+
+        await tx.refreshToken.updateMany({ where: { workspaceId: id, revokedAt: null }, data: { revokedAt: now } });
+        await tx.auditLog.deleteMany({ where: { workspaceId: id } });
+        await tx.invitation.deleteMany({ where: { workspaceId: id } });
+        await tx.membership.deleteMany({ where: { workspaceId: id } });
+        await tx.workspace.delete({ where: { id } });
+        await insertAuditEntry(tx, {
+          action: 'workspace.deleted',
+          userId: actor.userId,
+          workspaceId: null,
+          ip: actor.ip,
+          meta: { workspaceName: workspace.name },
+        });
+        return 'deleted';
+      },
+      { timeout: DELETE_TRANSACTION_TIMEOUT_MS },
+    );
+  }
+
+  private setArchivedAt(id: string, archivedAt: Date | null): Promise<LifecycleResult> {
+    return this.prisma.$transaction(async (tx): Promise<LifecycleResult> => {
+      await lockWorkspace(tx, id);
+      const workspace = await tx.workspace.findUnique({ where: { id } });
+      if (!workspace) return 'not-found';
+      if ((workspace.archivedAt === null) === (archivedAt === null)) return 'already-in-state';
+      await tx.workspace.update({ where: { id }, data: { archivedAt } });
+      return 'done';
+    });
   }
 }

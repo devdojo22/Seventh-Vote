@@ -1,3 +1,4 @@
+import { PreviousPrincipalOutcome } from '@prisma/client';
 import { z } from 'zod';
 import { emailSchema } from '../../shared/validation/email.js';
 
@@ -16,7 +17,13 @@ export const createWorkspaceSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, digits and single hyphens'),
 });
 
-export const designatePrincipalSchema = z.object({ email: emailSchema });
+export const designatePrincipalSchema = z.object({
+  email: emailSchema,
+  previousPrincipal: z.nativeEnum(PreviousPrincipalOutcome).default(PreviousPrincipalOutcome.REMOVE),
+});
+
+/** The workspace's slug, typed by the super-admin to confirm a permanent deletion. */
+export const deleteWorkspaceSchema = z.object({ confirmSlug: z.string().trim().min(1).max(60) }).strict();
 
 export const inviteAffiliateSchema = z.object({
   email: emailSchema,
@@ -47,5 +54,6 @@ export const updateSettingsSchema = z.object({ voteRules: voteRulesSchema }).str
 export const idParamSchema = z.string().uuid();
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
+export type DesignatePrincipalInput = z.infer<typeof designatePrincipalSchema>;
 export type InviteAffiliateInput = z.infer<typeof inviteAffiliateSchema>;
 export type VoteRulesInput = z.infer<typeof voteRulesSchema>;
