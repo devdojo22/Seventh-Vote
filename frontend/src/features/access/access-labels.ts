@@ -1,6 +1,18 @@
-import type { Role } from '@/types/access';
+import type { PreviousPrincipalOutcome, Role } from '@/types/access';
 
 export const ROLE_LABELS: Record<Role, string> = { PRINCIPAL: 'Principal', AFFILIATE: 'Affiliate' };
+
+export const PREVIOUS_PRINCIPAL_OUTCOME_LABELS: Record<PreviousPrincipalOutcome, string> = {
+  REMOVE: 'Remove from workspace',
+  KEEP_AS_AFFILIATE: 'Keep as Affiliate',
+};
+
+export const PREVIOUS_PRINCIPAL_OUTCOME_DESCRIPTIONS: Record<PreviousPrincipalOutcome, string> = {
+  REMOVE:
+    'The current Principal loses access to this workspace and is signed out of it. Their account and other workspaces are not affected.',
+  KEEP_AS_AFFILIATE:
+    'The current Principal stays in this workspace as an Affiliate without dossier-edit permission, and is signed out of it once.',
+};
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   PRINCIPAL:

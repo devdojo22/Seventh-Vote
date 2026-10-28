@@ -153,6 +153,13 @@ export const ShieldIcon = ({ className }: IconProps) => (
   </Icon>
 );
 
+export const ArchiveIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+  </Icon>
+);
+
 export const SignOutIcon = ({ className }: IconProps) => (
   <Icon className={className}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

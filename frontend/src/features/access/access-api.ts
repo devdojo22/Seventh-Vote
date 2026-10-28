@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { withAccessToken } from '@/features/auth/auth-session';
 import { apiRequest } from '@/lib/api/http';
-import { ROLES } from '@/types/access';
+import { ROLES, type PreviousPrincipalOutcome } from '@/types/access';
 
 
 const memberSchema = z.object({
@@ -28,6 +28,7 @@ const adminWorkspaceSchema = z.object({
   id: z.guid(),
   name: z.string(),
   slug: z.string(),
+  archivedAt: z.iso.datetime({ offset: true }).nullable(),
   createdAt: z.iso.datetime({ offset: true }),
   principal: z
     .object({ userId: z.guid(), email: z.string().min(1), name: z.string().nullable() })
@@ -176,16 +177,52 @@ export function createWorkspace(name: string, slug: string): Promise<unknown> {
   );
 }
 
+const adminWorkspacePath = (workspaceId: string) =>
+  `/auth/admin/workspaces/${encodeURIComponent(workspaceId)}`;
+
 export function designatePrincipal(
   workspaceId: string,
   email: string,
+  previousPrincipal: PreviousPrincipalOutcome,
 ): Promise<DesignatePrincipalResult> {
   return withAccessToken((bearer) =>
-    apiRequest(`/auth/admin/workspaces/${encodeURIComponent(workspaceId)}/principal`, {
+    apiRequest(`${adminWorkspacePath(workspaceId)}/principal`, {
       method: 'POST',
       bearer,
-      body: { email },
+      body: { email, previousPrincipal },
       schema: designatePrincipalSchema,
+    }),
+  );
+}
+
+export function archiveWorkspace(workspaceId: string): Promise<void> {
+  return withAccessToken((bearer) =>
+    apiRequest(`${adminWorkspacePath(workspaceId)}/archive`, {
+      method: 'POST',
+      bearer,
+      schema: z.undefined(),
+    }),
+  );
+}
+
+export function restoreWorkspace(workspaceId: string): Promise<void> {
+  return withAccessToken((bearer) =>
+    apiRequest(`${adminWorkspacePath(workspaceId)}/restore`, {
+      method: 'POST',
+      bearer,
+      schema: z.undefined(),
+    }),
+  );
+}
+
+/** Irreversible. The server deletes only an archived workspace whose slug matches `confirmSlug`. */
+export function deleteWorkspace(workspaceId: string, confirmSlug: string): Promise<void> {
+  return withAccessToken((bearer) =>
+    apiRequest(adminWorkspacePath(workspaceId), {
+      method: 'DELETE',
+      bearer,
+      body: { confirmSlug },
+      schema: z.undefined(),
     }),
   );
 }
