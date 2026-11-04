@@ -10,6 +10,7 @@ import {
   SessionIcon,
   ShieldIcon,
   SignOutIcon,
+  SourceDocIcon,
   UserIcon,
   type IconProps,
 } from '@/components/ui/icons';
@@ -29,6 +30,7 @@ interface NavItem {
   label: string;
   short: string;
   Icon: ComponentType<IconProps>;
+  matchNested?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -41,6 +43,15 @@ const NAV_ITEMS: NavItem[] = [
 function useManagementNavItems(): NavItem[] {
   const user = useCurrentUser();
   const items: NavItem[] = [];
+  if (user.activeWorkspaceId !== null && user.permissions?.viewDossiers) {
+    items.push({
+      to: '/dossiers',
+      label: 'Dossiers',
+      short: 'Dossiers',
+      Icon: SourceDocIcon,
+      matchNested: true,
+    });
+  }
   if (user.activeWorkspaceId !== null) {
     items.push({
       to: `/workspaces/${user.activeWorkspaceId}/settings`,
@@ -221,11 +232,11 @@ function SidebarLinks({
 }) {
   return (
     <nav className="grid gap-1" aria-label={label}>
-      {items.map(({ to, label: text, Icon }) => (
+      {items.map(({ to, label: text, Icon, matchNested }) => (
         <NavLink
           key={to}
           to={to}
-          end
+          end={!matchNested}
           className={({ isActive }) =>
             `group relative flex items-center gap-3 rounded-xl p-1.5 text-[13.5px] font-semibold transition-all duration-200 ${FOCUS_RING_CLASS} ${
               collapsed ? 'justify-center' : 'pr-3'
@@ -452,11 +463,11 @@ export function WorkspaceBar() {
           aria-label="Management"
           className="flex min-w-0 flex-wrap gap-2 sm:ml-auto sm:justify-end"
         >
-          {managementItems.map(({ to, label, Icon }) => (
+          {managementItems.map(({ to, label, Icon, matchNested }) => (
             <NavLink
               key={to}
               to={to}
-              end
+              end={!matchNested}
               className={({ isActive }) =>
                 `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors duration-200 ${FOCUS_RING_CLASS} ${
                   isActive

@@ -10,6 +10,11 @@ import { MfaPage } from '@/features/auth/MfaPage';
 import { RequireAuth } from '@/features/auth/RequireAuth';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { ChamberPage } from '@/features/chamber/ChamberPage';
+import { CouncilBoundary } from '@/features/council/CouncilBoundary';
+import { DossierEditorPage } from '@/features/dossiers/DossierEditorPage';
+import { DossierPage } from '@/features/dossiers/DossierPage';
+import { DossiersPage } from '@/features/dossiers/DossiersPage';
+import { DossierVersionPage } from '@/features/dossiers/DossierVersionPage';
 import { MethodologyPage } from '@/features/methodology/MethodologyPage';
 import { PrepPage } from '@/features/prep/PrepPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
@@ -52,10 +57,40 @@ export const routes: RouteObject[] = [
               {
                 element: <RequireWorkspace />,
                 children: [
-                  { index: true, element: <ChamberPage />, handle: page('Home') },
-                  { path: 'session', element: <SessionPage />, handle: page('Council Session') },
-                  { path: 'prep', element: <PrepPage />, handle: page('1-on-1 Prep') },
-                  { path: 'method', element: <MethodologyPage />, handle: page('Methodology') },
+                  {
+                    element: <CouncilBoundary />,
+                    children: [
+                      { index: true, element: <ChamberPage />, handle: page('Home') },
+                      {
+                        path: 'session',
+                        element: <SessionPage />,
+                        handle: page('Council Session'),
+                      },
+                      { path: 'prep', element: <PrepPage />, handle: page('1-on-1 Prep') },
+                      { path: 'method', element: <MethodologyPage />, handle: page('Methodology') },
+                    ],
+                  },
+                  { path: 'dossiers', element: <DossiersPage />, handle: page('Dossiers') },
+                  {
+                    path: 'dossiers/new',
+                    element: <DossierEditorPage />,
+                    handle: page('New dossier'),
+                  },
+                  {
+                    path: 'dossiers/:dossierId',
+                    element: <DossierPage />,
+                    handle: page('Dossier'),
+                  },
+                  {
+                    path: 'dossiers/:dossierId/edit',
+                    element: <DossierEditorPage />,
+                    handle: page('Edit dossier'),
+                  },
+                  {
+                    path: 'dossiers/:dossierId/versions/:versionNumber',
+                    element: <DossierVersionPage />,
+                    handle: page('Dossier version'),
+                  },
                   {
                     path: 'workspaces/:workspaceId/members',
                     element: <MembersPage />,
