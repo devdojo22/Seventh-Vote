@@ -11,19 +11,21 @@ export interface CouncilConfig {
   termLabel: string;
   snapshotLabel: string;
   snapshotNote: string;
-  rulesOfProcedure: Citation;
-  /** Used when a dossier's free-text leadership_role cannot be parsed unambiguously. */
+  rulesOfProcedure: Citation | null;
   leadershipFallback: {
     chair: CouncilOfficer;
     viceChair: CouncilOfficer;
     chairEmeritus: CouncilOfficer;
-  };
-  /** Procedural copy shown beside results. */
+  } | null;
   procedure: {
-    oneShotStakes: { title: string; body: string };
+    oneShotStakes: { title: string; body: string } | null;
     committeeReferralHint: string;
     committeeChairHint: string;
     attendanceNote: string;
     consentNote: string;
+  };
+  research: {
+    sourceCaveats: string[];
+    knownLimitations: string;
   };
 }

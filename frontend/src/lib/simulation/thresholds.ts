@@ -10,7 +10,7 @@ export function thresholdFor(rule: ActionRule, presentCount: number, seatCount: 
       basis: 'full',
       needed: rule.needed,
       denominator: seatCount,
-      reachable: true,
+      reachable: rule.needed <= seatCount,
       label: `${rule.needed} of ${seatCount}`,
     };
   }
@@ -37,13 +37,15 @@ export function thresholdFor(rule: ActionRule, presentCount: number, seatCount: 
   };
 }
 
-/**
- * Votes the user's side needs. Passing takes `needed`; blocking takes enough
- * non-yes votes that `needed` can no longer be reached.
- */
 export function goalTarget(threshold: Threshold, direction: Direction): number {
   if (threshold.basis === 'consent' || direction === 'support') return threshold.needed;
   return Math.max(1, threshold.denominator - threshold.needed + 1);
+}
+
+export function unreachableReason(threshold: Threshold): string {
+  return threshold.basis === 'full' && !threshold.reachable
+    ? `This rule needs ${threshold.label} seats: it can’t be met`
+    : 'No members present: nothing can be voted on';
 }
 
 export function thresholdPreviewLine(threshold: Threshold): string {
@@ -56,4 +58,9 @@ export function findRule(rules: ActionRule[], id: ActionRule['id']): ActionRule 
   const rule = rules.find((r) => r.id === id);
   if (!rule) throw new Error(`Unknown action rule: ${id}`);
   return rule;
+}
+
+
+export function ruleOrOrdinary(rules: ActionRule[], id: ActionRule['id']): ActionRule {
+  return rules.find((r) => r.id === id) ?? findRule(rules, 'ordinary');
 }

@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/api/http';
 import { useAuthSessionStore } from '@/stores/auth-session-store';
+import { useCouncilStore } from '@/stores/council-store';
 import { useInvitationStore } from '@/stores/invitation-store';
 import { usePrepStore } from '@/stores/prep-store';
 import { useSessionStore } from '@/stores/session-store';
@@ -30,6 +31,8 @@ let dataOwnerId: string | null = null;
 function clearUserData({ keepInvitation }: { keepInvitation: boolean }): void {
   useWorkspaceStore.getState().clearCalls();
   useSessionStore.getState().reset();
+  // Council first: prep's reset rebuilds its defaults from the council, which must already be empty.
+  useCouncilStore.getState().clear();
   usePrepStore.getState().reset();
   if (!keepInvitation) useInvitationStore.getState().clearToken();
   dataOwnerId = null;
