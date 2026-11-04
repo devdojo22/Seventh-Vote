@@ -6,6 +6,10 @@ const API_ERROR_CODES = [
   'too_many_attempts',
   'resend_cooldown',
   'account_exists',
+  'validation_error',
+  'version_conflict',
+  'dossier_archived',
+  'status_unchanged',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
