@@ -2,7 +2,7 @@ import { createApp } from './app.js';
 import { ConfigurationError, loadConfig, type AppConfig } from './config/environment.js';
 import { createDatabaseHealthCheck, createPrismaRepositories, createServices } from './dependencies.js';
 import { createPrismaClient } from './infrastructure/database/prisma.client.js';
-import { NylasEmailSender } from './infrastructure/email/email-sender.js';
+import { ResendEmailSender } from './infrastructure/email/email-sender.js';
 import { startCleanupJob } from './modules/cleanup/cleanup.job.js';
 import { PrismaCleanupRepository } from './modules/cleanup/cleanup.repository.js';
 import { createLogger } from './infrastructure/logging/logger.js';
@@ -29,7 +29,7 @@ const repositories = createPrismaRepositories(prisma);
 const app = createApp({
   config,
   logger,
-  services: createServices(config, repositories, new NylasEmailSender(config.email)),
+  services: createServices(config, repositories, new ResendEmailSender(config.email)),
   checkDatabase: createDatabaseHealthCheck(prisma),
   rateLimitCounters: repositories.loginAttempts,
 });
