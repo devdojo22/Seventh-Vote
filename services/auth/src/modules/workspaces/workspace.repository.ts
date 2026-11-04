@@ -34,6 +34,31 @@ export async function lockWorkspace(tx: Prisma.TransactionClient, workspaceId: s
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`workspace:${workspaceId}`}))`;
 }
 
+async function deleteAppData(tx: Prisma.TransactionClient, workspaceId: string): Promise<void> {
+  const [schema] = await tx.$queryRaw<{ present: boolean }[]>`
+    SELECT to_regclass('app.members') IS NOT NULL AS present`;
+  if (schema?.present !== true) return;
+
+  await tx.$executeRaw`UPDATE app.dossiers SET current_version_id = NULL WHERE workspace_id = ${workspaceId}::uuid`;
+  await tx.$executeRaw`
+    DELETE FROM app.review_status_changes WHERE version_id IN (
+      SELECT v.id FROM app.dossier_versions v JOIN app.dossiers d ON d.id = v.dossier_id
+      WHERE d.workspace_id = ${workspaceId}::uuid)`;
+  await tx.$executeRaw`
+    DELETE FROM app.key_records WHERE version_id IN (
+      SELECT v.id FROM app.dossier_versions v JOIN app.dossiers d ON d.id = v.dossier_id
+      WHERE d.workspace_id = ${workspaceId}::uuid)`;
+  await tx.$executeRaw`
+    DELETE FROM app.voice_quotes WHERE version_id IN (
+      SELECT v.id FROM app.dossier_versions v JOIN app.dossiers d ON d.id = v.dossier_id
+      WHERE d.workspace_id = ${workspaceId}::uuid)`;
+  await tx.$executeRaw`
+    DELETE FROM app.dossier_versions WHERE dossier_id IN (
+      SELECT id FROM app.dossiers WHERE workspace_id = ${workspaceId}::uuid)`;
+  await tx.$executeRaw`DELETE FROM app.dossiers WHERE workspace_id = ${workspaceId}::uuid`;
+  await tx.$executeRaw`DELETE FROM app.members WHERE workspace_id = ${workspaceId}::uuid`;
+}
+
 export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
   updateVoteRules(id: string, rules: VoteRulesUpdate): Promise<Workspace | null>;
@@ -102,6 +127,7 @@ export class PrismaWorkspaceRepository implements WorkspaceRepository {
         await tx.auditLog.deleteMany({ where: { workspaceId: id } });
         await tx.invitation.deleteMany({ where: { workspaceId: id } });
         await tx.membership.deleteMany({ where: { workspaceId: id } });
+        await deleteAppData(tx, id);
         await tx.workspace.delete({ where: { id } });
         await insertAuditEntry(tx, {
           action: 'workspace.deleted',
