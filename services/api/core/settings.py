@@ -69,6 +69,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["core.permissions.IsWorkspaceMember"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "UNAUTHENTICATED_USER": None,
+    "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
 }
 
 JWT_SECRET = os.environ["JWT_SECRET"]
