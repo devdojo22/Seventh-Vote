@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { withAccessToken } from '@/features/auth/auth-session';
 import { apiRequest } from '@/lib/api/http';
+import { useCouncilStore } from '@/stores/council-store';
 import { ROLES, type PreviousPrincipalOutcome } from '@/types/access';
-
 
 const memberSchema = z.object({
   userId: z.guid(),
@@ -72,11 +72,12 @@ export function getWorkspaceSettings(workspaceId: string): Promise<WorkspaceSett
   );
 }
 
-export function updateVoteRules(
+/** Saves the vote rules. The council's thresholds come from them, so a successful save refreshes it. */
+export async function updateVoteRules(
   workspaceId: string,
   voteRules: VoteRules,
 ): Promise<WorkspaceSettings> {
-  return withAccessToken((bearer) =>
+  const settings = await withAccessToken((bearer) =>
     apiRequest(`${workspacePath(workspaceId)}/settings`, {
       method: 'PUT',
       bearer,
@@ -84,6 +85,8 @@ export function updateVoteRules(
       schema: workspaceSettingsSchema,
     }),
   );
+  useCouncilStore.getState().markStale();
+  return settings;
 }
 
 export function listMembers(workspaceId: string): Promise<Member[]> {

@@ -9,8 +9,9 @@ export type RecordDepthLabel = 'Strong' | 'Moderate' | 'Thin';
 
 const THIN_RECORD_PENALTY = 3;
 const MAX_DOSSIER_SOURCES = 15;
+const NO_LEADERSHIP_ROLE = /^\s*none/i;
+const NOT_A_COUNCIL_OFFICE = /committee|emeritus|\b(former|past|ex|elect|outgoing|incoming|not)\b/i;
 
-/** Two-letter avatar initials, skipping generational suffixes. */
 export function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -20,7 +21,6 @@ export function initials(name: string): string {
     .join('');
 }
 
-/** Posture toward the mayor's administration, from the mayor_alignment dossier field. */
 export function alignment(member: Member): MayorPosture {
   const raw = member.mayor_alignment;
   const text = (typeof raw === 'string' ? raw : (raw.relationship ?? '')).toLowerCase().trim();
@@ -39,7 +39,6 @@ export const POSTURE_CLASSES: Record<MayorPosture, string> = {
   independent: 'bg-steel-bg text-steel',
 };
 
-/** Record depth from dossier richness: label and bar percent. */
 export function recordDepth(member: Member): { label: RecordDepthLabel; percent: number } {
   let score =
     member.key_votes.length +
@@ -53,7 +52,7 @@ export function recordDepth(member: Member): { label: RecordDepthLabel; percent:
 
 /** Short role line for a member card: leadership role, else top committee chairmanship. */
 export function primaryRole(member: Member): string {
-  if (!/^none/i.test(member.leadership_role)) return member.leadership_role;
+  if (!NO_LEADERSHIP_ROLE.test(member.leadership_role)) return member.leadership_role;
   const chaired = Object.entries(member.committees).find(([, role]) => /chair/i.test(role));
   return chaired ? `${chaired[1]} · ${chaired[0]}` : 'Council member';
 }
@@ -62,24 +61,37 @@ export function sinceYear(tookOffice: string): string {
   return tookOffice.match(/\d{4}/)?.[0] ?? tookOffice;
 }
 
-/** Resolve a dossier text field that is either a plain string or a structured record. */
 export function fieldText(value: string | PoliticalStyle | TwinVoice): string {
   if (typeof value === 'string') return value;
   return 'description' in value ? value.description : value.style;
 }
 
-/** Officers named in dossiers when the role text is a clear match, else the snapshot fallback. */
+
+function councilOffice(role: string): 'chair' | 'viceChair' | null {
+  if (NO_LEADERSHIP_ROLE.test(role)) return null;
+  const title = role.split(/[(;—–]|\s-\s/)[0] ?? '';
+  if (NOT_A_COUNCIL_OFFICE.test(title)) return null;
+  if (/\bvice[-\s]?chair(man|woman|person)?\b/i.test(title)) return 'viceChair';
+  return /\bchair(man|woman|person)?\b/i.test(title) ? 'chair' : null;
+}
+
+
 export function councilOfficers(
   members: Member[],
   fallback: CouncilConfig['leadershipFallback'],
 ): CouncilOfficer[] {
   const named = {
-    chair: members.find((m) => /^chairwoman\b/i.test(m.leadership_role.trim())),
-    viceChair: members.find((m) =>
-      /\bvice chairman of the memphis city council\b/i.test(m.leadership_role),
-    ),
+    chair: members.find((m) => councilOffice(m.leadership_role) === 'chair'),
+    viceChair: members.find((m) => councilOffice(m.leadership_role) === 'viceChair'),
     chairEmeritus: members.find((m) => /chair emeritus/i.test(m.leadership_role)),
   };
+  if (!fallback) {
+    return [
+      named.chair && { title: 'Chair', name: named.chair.name },
+      named.viceChair && { title: 'Vice Chair', name: named.viceChair.name },
+      named.chairEmeritus && { title: 'Chair Emeritus', name: named.chairEmeritus.name },
+    ].filter((officer) => officer !== undefined);
+  }
   return [
     { title: fallback.chair.title, name: named.chair?.name ?? fallback.chair.name },
     { title: fallback.viceChair.title, name: named.viceChair?.name ?? fallback.viceChair.name },
@@ -90,8 +102,7 @@ export function councilOfficers(
   ];
 }
 
-/** Rules of Procedure first, then up to 15 unique valid source links across all dossiers. */
-export function buildSourceCloud(members: Member[], rulesOfProcedure: Citation): Citation[] {
+export function buildSourceCloud(members: Member[], rulesOfProcedure: Citation | null): Citation[] {
   const seen = new Map<string, string>();
   const add = (name: string, url: string) => {
     if (isHttpUrl(url) && !seen.has(name)) seen.set(name, url);
@@ -107,5 +118,5 @@ export function buildSourceCloud(members: Member[], rulesOfProcedure: Citation):
     url,
     label: name,
   }));
-  return [rulesOfProcedure, ...dossier];
+  return rulesOfProcedure ? [rulesOfProcedure, ...dossier] : dossier;
 }

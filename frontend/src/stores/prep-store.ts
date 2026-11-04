@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { SESSION_DEFAULTS } from '@/data/session-defaults';
 import {
   buildPrepBrief,
   prepInput,
@@ -19,12 +18,13 @@ interface PrepState {
 }
 
 function initialPrep(): Pick<PrepState, 'values' | 'sessionContext' | 'brief'> {
+  const { members, sessionDefaults } = useCouncilStore.getState();
   return {
     values: {
-      memberId: useCouncilStore.getState().members[0]?.id ?? '',
-      category: SESSION_DEFAULTS.category,
-      ask: SESSION_DEFAULTS.ask,
-      pitch: SESSION_DEFAULTS.desc,
+      memberId: members[0]?.id ?? '',
+      category: sessionDefaults.category,
+      ask: sessionDefaults.ask,
+      pitch: sessionDefaults.desc,
     },
     sessionContext: null,
     brief: null,

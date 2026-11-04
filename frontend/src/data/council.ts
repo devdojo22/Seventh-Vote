@@ -1,11 +1,11 @@
 import type { CouncilConfig } from '@/types/council';
 
-export const councilConfig: CouncilConfig = {
+
+export const councilConfig: Omit<CouncilConfig, 'seatCount'> = {
   councilName: 'Memphis City Council',
-  seatCount: 13,
   termLabel: '2024–27',
   snapshotLabel: 'Research snapshot · Sep 16, 2026',
-  snapshotNote: 'Runs locally against the Sep 16 public-record snapshot.',
+  snapshotNote: 'Runs against the Sep 16 public-record snapshot.',
   rulesOfProcedure: {
     id: 'rules-of-procedure',
     name: 'Memphis City Council Rules of Procedure',
@@ -28,5 +28,12 @@ export const councilConfig: CouncilConfig = {
       'Absent and recused members are excluded from “majority present” math. Full-membership thresholds stay fixed. Recusal denominator treatment is a rehearsal assumption pending Charter or legal verification.',
     consentNote:
       'Rule 45 allows any one member to pull an item from consent for normal handling. Focus on objection risk, not a passage count.',
+  },
+  research: {
+    sourceCaveats: [
+      'Citizen Portal AI recaps are flagged for verification against official minutes.',
+    ],
+    knownLimitations:
+      'Freshman members have thinner records; Janika White has frequent recusals; several Citizen Portal vote summaries remain unverified against official minutes.',
   },
 };

@@ -73,7 +73,7 @@ export function SessionResults({
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <Callout title={threshold.note}>{thresholdExplanation(analysis)}</Callout>
-          <Callout title={oneShot.title}>{oneShot.body}</Callout>
+          {oneShot && <Callout title={oneShot.title}>{oneShot.body}</Callout>}
         </div>
       </div>
 

@@ -1,15 +1,10 @@
 import type { ActionRule } from '@/types/simulation';
 
-/** Passage rules per procedural action. Full-membership rules read the seat count from councilConfig. */
-export const ACTION_RULES: ActionRule[] = [
-  {
-    id: 'ordinary',
-    label: 'Ordinary ordinance or resolution',
-    basis: 'full',
-    needed: 7,
-    verified: false,
-    note: 'Working inference only · ordinary passage is Charter-governed and not verified in the Rules',
-  },
+/** The Memphis snapshot's ordinary rule, while its workspace has no saved vote rules. */
+export const ORDINARY_INFERENCE_NOTE =
+  'Working inference only · ordinary passage is Charter-governed and not verified in the Rules';
+
+export const PROCEDURAL_RULES: ActionRule[] = [
   {
     id: 'censure',
     label: 'Censure of a member',
