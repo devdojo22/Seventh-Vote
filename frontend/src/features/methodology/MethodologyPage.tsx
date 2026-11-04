@@ -15,7 +15,8 @@ export function MethodologyPage() {
   const members = useCouncilStore((s) => s.members);
   const membersById = useCouncilStore((s) => s.membersById);
   const rules = useCouncilStore((s) => s.rules);
-  const { seatCount, rulesOfProcedure } = useCouncilStore((s) => s.config);
+  const snapshot = useCouncilStore((s) => s.snapshot);
+  const { seatCount, rulesOfProcedure, research } = useCouncilStore((s) => s.config);
 
   const cloud = buildSourceCloud(members, rulesOfProcedure);
   const needed = (id: 'censure' | 'rules_amendment' | 'ordinary') => {
@@ -26,12 +27,24 @@ export function MethodologyPage() {
     .map((id) => membersById[id]?.name)
     .filter(Boolean)
     .join(' and ');
+  const ordinary = findRule(rules, 'ordinary');
+
+  const thresholdLimits = snapshot
+    ? [
+        `Rules-aware thresholds: censure requires ${needed('censure')} of ${seatCount}; Rules amendments require ${needed('rules_amendment')} of ${seatCount}; listed procedural motions use a majority of members present.`,
+        ordinary.verified
+          ? `Ordinary items need ${needed('ordinary')} of ${seatCount}, from this workspace’s vote rules.`
+          : `The ordinary ${needed('ordinary')}-vote default is an unverified working inference because ordinary passage is Charter-governed, not stated in the Rules.`,
+      ]
+    : [
+        `Ordinary items need ${needed('ordinary')} of ${seatCount}${ordinary.verified ? ', from this workspace’s vote rules' : ', a working inference until this workspace’s vote rules are set'}; procedural motions use a majority of members present.`,
+      ];
 
   const limits = [
-    `Rules-aware thresholds: censure requires ${needed('censure')} of ${seatCount}; Rules amendments require ${needed('rules_amendment')} of ${seatCount}; listed procedural motions use a majority of members present.`,
-    `The ordinary ${needed('ordinary')}-vote default is an unverified working inference because ordinary passage is Charter-governed, not stated in the Rules.`,
+    ...thresholdLimits,
     METHODOLOGY.consentLimit,
     ...METHODOLOGY.limits,
+    ...research.sourceCaveats,
     ...(noDirectVoice
       ? [
           `${noDirectVoice} receives no invented direct voice because no verified verbatim 2024–26 quotes were found.`,
@@ -72,8 +85,12 @@ export function MethodologyPage() {
             <h2 className={PANEL_TITLE_CLASS}>What this prototype does — and does not</h2>
             <p className="text-[13px] leading-relaxed text-ink/80">
               It reasons over researched public-record dossiers for all {members.length} members and
-              applies the published Rules of Procedure to the selected item type. It does not ingest
-              live agendas or full transcripts, and it contains no private notes or interviews.
+              applies{' '}
+              {rulesOfProcedure
+                ? 'the published Rules of Procedure'
+                : 'this workspace’s vote rules'}{' '}
+              to the selected item type. It does not ingest live agendas or full transcripts, and it
+              contains no private notes or interviews.
             </p>
             <BulletList items={limits} className="text-[13px] leading-relaxed text-ink/80" />
           </div>
@@ -107,7 +124,9 @@ export function MethodologyPage() {
               </li>
             ))}
           </ol>
-          <Callout title="Known limitations.">{METHODOLOGY.knownLimitations}</Callout>
+          {research.knownLimitations && (
+            <Callout title="Known limitations.">{research.knownLimitations}</Callout>
+          )}
         </Card>
       </div>
     </section>

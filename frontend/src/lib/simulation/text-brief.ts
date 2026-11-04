@@ -1,10 +1,11 @@
 import { CATEGORY_LABELS } from '@/data/agenda';
 import type { SessionAnalysis, SessionInput } from '@/types/simulation';
+import { unreachableReason } from './thresholds';
 
 function outcomeLine(analysis: SessionAnalysis): string {
   const { threshold, direction, goalCount, target, outcome } = analysis;
   if (outcome === 'consent') return threshold.note;
-  if (outcome === 'unreachable') return 'No members present: nothing can be voted on.';
+  if (outcome === 'unreachable') return `${unreachableReason(threshold)}.`;
   const label = direction === 'oppose' ? 'Projected leaning to oppose' : 'Projected leaning-yes';
   return `${label}: ${goalCount}/${threshold.denominator} (${target} needed) · ${threshold.note}`;
 }

@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/Card';
+import { unreachableReason } from '@/lib/simulation/thresholds';
 import type { SessionAnalysis } from '@/types/simulation';
 
 const COPY = {
@@ -34,7 +35,7 @@ function outcomeText(analysis: SessionAnalysis): string {
 }
 
 export function TallyPanel({ analysis }: { analysis: SessionAnalysis }) {
-  const { tally, outcome, direction } = analysis;
+  const { tally, outcome, direction, threshold } = analysis;
   const copy = COPY[direction];
   const summary = tally.map((s) => `${s.count} ${s.label}`).join(', ');
 
@@ -43,7 +44,7 @@ export function TallyPanel({ analysis }: { analysis: SessionAnalysis }) {
       <div className="flex flex-col items-start justify-between gap-1.5 sm:flex-row sm:items-baseline">
         {outcome === 'unreachable' ? (
           <strong className="font-display text-lg font-bold text-brick sm:text-xl">
-            No members present: nothing can be voted on
+            {unreachableReason(threshold)}
           </strong>
         ) : (
           <>
