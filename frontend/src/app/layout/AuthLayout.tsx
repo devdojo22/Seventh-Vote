@@ -2,7 +2,6 @@ import type { ComponentType } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { BrandLogo } from '@/components/BrandLogo';
 import { LockIcon, ShieldIcon, SourceDocIcon, type IconProps } from '@/components/ui/icons';
-import { useCouncilStore } from '@/stores/council-store';
 
 interface Assurance {
   Icon: ComponentType<IconProps>;
@@ -29,9 +28,6 @@ const ASSURANCES: Assurance[] = [
 ];
 
 function BrandPanel() {
-  const seatCount = useCouncilStore((s) => s.config.seatCount);
-  const snapshotLabel = useCouncilStore((s) => s.config.snapshotLabel);
-
   return (
     <aside className="relative hidden w-[44%] max-w-[560px] shrink-0 flex-col overflow-hidden bg-navy px-10 py-10 text-white shadow-[1px_0_0_rgb(200_155_60/0.55)] lg:flex xl:px-14">
       <div
@@ -51,8 +47,8 @@ function BrandPanel() {
           Know your count before the count.
         </h2>
         <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/65">
-          Rehearse agenda items against {seatCount} public-record dossiers, find the pivotal vote,
-          and plan the conversations that matter.
+          Rehearse agenda items against your council’s public-record dossiers, find the pivotal
+          vote, and plan the conversations that matter.
         </p>
 
         <ul className="mt-10 grid max-w-md gap-5">
@@ -79,7 +75,7 @@ function BrandPanel() {
         </span>
         <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 font-medium whitespace-nowrap text-white/80">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-gold" />
-          {snapshotLabel}
+          Public-record rehearsal
         </span>
       </div>
     </aside>

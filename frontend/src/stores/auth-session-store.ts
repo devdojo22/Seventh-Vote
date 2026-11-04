@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { CurrentUser } from '@/features/auth/auth-api';
 import type { Role } from '@/types/access';
 
-
 export type AuthStatus = 'unknown' | 'loading' | 'authenticated' | 'anonymous' | 'error';
 
 interface SessionTokens {
@@ -76,4 +75,10 @@ export function useCurrentUser(): CurrentUser {
   const user = useAuthSessionStore((s) => s.user);
   if (!user) throw new Error('useCurrentUser must be used inside an authenticated route');
   return user;
+}
+
+export function useWorkspaceInSync(): boolean {
+  const tokenWorkspaceId = useAuthSessionStore((s) => s.workspaceId);
+  const activeWorkspaceId = useAuthSessionStore((s) => s.user?.activeWorkspaceId ?? null);
+  return activeWorkspaceId === null || tokenWorkspaceId === activeWorkspaceId;
 }
