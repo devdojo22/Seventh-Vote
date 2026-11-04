@@ -17,17 +17,13 @@ class EmailProviderError extends Error {
   constructor(
     readonly status: number,
     readonly errorType: string | null,
-    readonly requestId: string | null,
   ) {
     super(`Email provider responded with HTTP ${status}`);
   }
 }
 
-const acceptedSchema = z.object({ data: z.object({}).passthrough() });
-const failureSchema = z.object({
-  request_id: z.string().optional(),
-  error: z.object({ type: z.string() }).optional(),
-});
+const acceptedSchema = z.object({ id: z.string() });
+const failureSchema = z.object({ name: z.string() });
 
 const SEND_TIMEOUT_MS = 30_000;
 
@@ -40,29 +36,32 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 
-export class NylasEmailSender implements EmailSender {
+function mailbox(name: string, email: string): string {
+  return `"${name.replace(/["\\]/g, '\\$&')}" <${email}>`;
+}
+
+export class ResendEmailSender implements EmailSender {
   private readonly sendUrl: string;
 
   constructor(private readonly config: EmailConfig) {
-    const { apiUri, sendDomain } = config.nylas;
-    this.sendUrl = `${apiUri}/v3/domains/${encodeURIComponent(sendDomain)}/messages/send`;
+    this.sendUrl = `${config.resend.apiUrl}/emails`;
   }
 
   async send({ to, subject, html }: EmailMessage): Promise<void> {
-    const { from, replyTo, nylas } = this.config;
+    const { from, replyTo, resend } = this.config;
     const response = await fetch(this.sendUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${nylas.apiKey}`,
+        Authorization: `Bearer ${resend.apiKey}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
       body: JSON.stringify({
-        to: [{ email: to }],
-        from: [from],
-        ...(replyTo === null ? {} : { reply_to: [{ email: replyTo }] }),
+        from: mailbox(from.name, from.email),
+        to: [to],
+        ...(replyTo === null ? {} : { reply_to: replyTo }),
         subject,
-        body: html,
+        html,
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
@@ -71,17 +70,11 @@ export class NylasEmailSender implements EmailSender {
     if (response.ok && acceptedSchema.safeParse(payload).success) return;
 
     const failure = failureSchema.safeParse(payload);
-    throw new EmailProviderError(
-      response.status,
-      failure.success ? (failure.data.error?.type ?? null) : null,
-      failure.success ? (failure.data.request_id ?? null) : null,
-    );
+    throw new EmailProviderError(response.status, failure.success ? failure.data.name : null);
   }
 }
 
-/** HTTP statuses after which the provider may still have sent the message (timeout or unknown server state). */
 const AMBIGUOUS_STATUSES = new Set([408, 500, 502, 504]);
-/** Connection failures that happen before any request reaches the provider. */
 const NOT_CONNECTED_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH']);
 
 function causeCode(error: Error): string | null {
@@ -109,7 +102,6 @@ export function describeDeliveryError(error: unknown): Record<string, string | n
       name: error.name,
       status: error.status,
       ...(error.errorType === null ? {} : { errorType: error.errorType }),
-      ...(error.requestId === null ? {} : { requestId: error.requestId }),
     };
   }
   if (error instanceof Error) return { name: error.name };

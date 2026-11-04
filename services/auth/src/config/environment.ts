@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-/** Duration accepted for token lifetimes: a positive integer with a unit, e.g. "900s", "15m", "12h", "7d". */
 const DURATION_PATTERN = /^(\d+)(s|m|h|d)$/;
 const SECONDS_PER_UNIT = { s: 1, m: 60, h: 3600, d: 86_400 } as const;
 
@@ -26,7 +25,6 @@ function durationToSeconds(value: string, ctx: z.RefinementCtx): number {
   return seconds;
 }
 
-/** Access tokens cannot be revoked one by one, so their lifetime is capped. */
 const MAX_ACCESS_TOKEN_TTL_SECONDS = 3600;
 
 const MS_PER_MINUTE = 60 * 1000;
@@ -44,68 +42,56 @@ const booleanFlag = optional(
     .transform((value) => value.toLowerCase() === 'true'),
 );
 
-const environmentSchema = z
-  .object({
-    NODE_ENV: optional(z.enum(['development', 'production', 'test']).default('development')),
-    LOG_LEVEL: optional(z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info')),
-    AUTH_PORT: optional(z.coerce.number().int().min(1).max(65_535).default(4000)),
-    DATABASE_URL: z.string().url(),
+const environmentSchema = z.object({
+  NODE_ENV: optional(z.enum(['development', 'production', 'test']).default('development')),
+  LOG_LEVEL: optional(z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info')),
+  AUTH_PORT: optional(z.coerce.number().int().min(1).max(65_535).default(4000)),
+  DATABASE_URL: z.string().url(),
 
-    JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
-    JWT_ISSUER: optional(z.string().min(1).default('seventh-vote-auth')),
-    JWT_AUDIENCE: optional(z.string().min(1).default('seventh-vote')),
-    ACCESS_TOKEN_TTL: optional(z.string().default('15m'))
-      .transform(durationToSeconds)
-      .refine((seconds) => seconds <= MAX_ACCESS_TOKEN_TTL_SECONDS, 'ACCESS_TOKEN_TTL must be at most 1h'),
-    /** "Keep me signed in" checked: persistent cookie, session ends after this many days without use. */
-    REFRESH_TOKEN_TTL_DAYS: optional(z.coerce.number().int().min(1).max(365).default(7)),
-    /** Unchecked: browser-session cookie, and the server also ends the session after this many hours without use. */
-    BROWSER_SESSION_TTL_HOURS: optional(z.coerce.number().int().min(1).max(168).default(12)),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_ISSUER: optional(z.string().min(1).default('seventh-vote-auth')),
+  JWT_AUDIENCE: optional(z.string().min(1).default('seventh-vote')),
+  ACCESS_TOKEN_TTL: optional(z.string().default('15m'))
+    .transform(durationToSeconds)
+    .refine((seconds) => seconds <= MAX_ACCESS_TOKEN_TTL_SECONDS, 'ACCESS_TOKEN_TTL must be at most 1h'),
+  REFRESH_TOKEN_TTL_DAYS: optional(z.coerce.number().int().min(1).max(365).default(7)),
+  BROWSER_SESSION_TTL_HOURS: optional(z.coerce.number().int().min(1).max(168).default(12)),
 
-    OTP_HMAC_KEY: z.string().min(32, 'OTP_HMAC_KEY must be at least 32 characters'),
+  OTP_HMAC_KEY: z.string().min(32, 'OTP_HMAC_KEY must be at least 32 characters'),
 
-    NYLAS_API_KEY: z.string().trim().min(1, 'NYLAS_API_KEY is required to send verification codes'),
-    /** Regional API host of the Nylas application, e.g. https://api.us.nylas.com. */
-    NYLAS_API_URI: z
+  RESEND_API_KEY: z.string().trim().min(1, 'RESEND_API_KEY is required to send verification codes'),
+  RESEND_API_URL: optional(
+    z
       .string()
       .trim()
       .url()
+      .default('https://api.resend.com')
       .transform((value) => value.replace(/\/+$/, '')),
-    /** Domain verified for Transactional Send, e.g. your-app.nylas.email or mail.example.gov. */
-    NYLAS_SEND_DOMAIN: z.string().trim().toLowerCase().min(1),
-    EMAIL_FROM_ADDRESS: z.string().trim().toLowerCase().email(),
-    EMAIL_FROM_NAME: optional(z.string().trim().min(1).default('Seventh Vote')),
-    /** Monitored mailbox for replies; Transactional Send has no default reply mailbox. */
-    EMAIL_REPLY_TO: optional(z.string().trim().email().optional()),
-    /** Linked as "Privacy Statement" at the foot of verification emails; omitted when unset. */
-    PRIVACY_STATEMENT_URL: optional(
-      z
-        .string()
-        .trim()
-        .url()
-        .refine((value) => value.startsWith('https://'), 'PRIVACY_STATEMENT_URL must use https')
-        .optional(),
-    ),
-
-    /** Trusted frontend origin used to build links in emails, e.g. https://app.example.gov. */
-    APP_BASE_URL: z
+  ),
+  EMAIL_FROM_ADDRESS: z.string().trim().toLowerCase().email(),
+  EMAIL_FROM_NAME: optional(z.string().trim().min(1).default('Seventh Vote')),
+  EMAIL_REPLY_TO: optional(z.string().trim().email().optional()),
+  PRIVACY_STATEMENT_URL: optional(
+    z
       .string()
       .trim()
       .url()
-      .transform((value) => value.replace(/\/+$/, '')),
+      .refine((value) => value.startsWith('https://'), 'PRIVACY_STATEMENT_URL must use https')
+      .optional(),
+  ),
 
-    /** Minutes between runs of the cleanup of expired tokens, codes, invitations and sign-in windows. */
-    CLEANUP_INTERVAL_MINUTES: optional(z.coerce.number().int().min(1).max(1440).default(60)),
+  APP_BASE_URL: z
+    .string()
+    .trim()
+    .url()
+    .transform((value) => value.replace(/\/+$/, '')),
 
-    /** Hours an emailed workspace invitation link stays usable. */
-    INVITATION_TTL_HOURS: optional(z.coerce.number().int().min(1).max(336).default(72)),
+  CLEANUP_INTERVAL_MINUTES: optional(z.coerce.number().int().min(1).max(1440).default(60)),
 
-    COOKIE_SECURE: booleanFlag,
-  })
-  .refine((e) => e.EMAIL_FROM_ADDRESS.endsWith(`@${e.NYLAS_SEND_DOMAIN}`), {
-    message: 'EMAIL_FROM_ADDRESS must be an address on NYLAS_SEND_DOMAIN',
-    path: ['EMAIL_FROM_ADDRESS'],
-  });
+  INVITATION_TTL_HOURS: optional(z.coerce.number().int().min(1).max(336).default(72)),
+
+  COOKIE_SECURE: booleanFlag,
+});
 
 export type NodeEnvironment = 'development' | 'production' | 'test';
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
@@ -128,10 +114,9 @@ export interface JwtConfig {
 }
 
 export interface EmailConfig {
-  readonly nylas: {
+  readonly resend: {
     readonly apiKey: string;
-    readonly apiUri: string;
-    readonly sendDomain: string;
+    readonly apiUrl: string;
   };
   readonly from: { readonly name: string; readonly email: string };
   readonly replyTo: string | null;
@@ -195,10 +180,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     }),
     otpHmacKey: e.OTP_HMAC_KEY,
     email: Object.freeze({
-      nylas: Object.freeze({
-        apiKey: e.NYLAS_API_KEY,
-        apiUri: e.NYLAS_API_URI,
-        sendDomain: e.NYLAS_SEND_DOMAIN,
+      resend: Object.freeze({
+        apiKey: e.RESEND_API_KEY,
+        apiUrl: e.RESEND_API_URL,
       }),
       from: Object.freeze({
         name: e.EMAIL_FROM_NAME,
