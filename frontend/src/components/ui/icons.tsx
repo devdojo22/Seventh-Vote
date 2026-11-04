@@ -166,3 +166,35 @@ export const SignOutIcon = ({ className }: IconProps) => (
     <path d="m16 17 5-5-5-5M21 12H9" />
   </Icon>
 );
+
+export const PencilIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+  </Icon>
+);
+
+export const MapPinIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />
+    <circle cx="12" cy="9.5" r="2.5" />
+  </Icon>
+);
+
+export const SortIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M4 7h16M7 12h10M10 17h4" />
+  </Icon>
+);
+
+export const HistoryIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+    <path d="M3 3v5h5M12 7v5l3 2" />
+  </Icon>
+);
+
+export const MoreVerticalIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M12 5h.01M12 12h.01M12 19h.01" strokeWidth="3" />
+  </Icon>
+);
