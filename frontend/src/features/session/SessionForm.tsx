@@ -12,7 +12,7 @@ import {
   IMPACT_OPTIONS,
   PRIORITY_OPTIONS,
 } from '@/data/form-options';
-import { findRule, thresholdFor, thresholdPreviewLine } from '@/lib/simulation/thresholds';
+import { ruleOrOrdinary, thresholdFor, thresholdPreviewLine } from '@/lib/simulation/thresholds';
 import { useCouncilStore } from '@/stores/council-store';
 import { ASKS, CATEGORY_IDS, type SessionInput } from '@/types/simulation';
 import { sessionSchema } from './session-schema';
@@ -71,7 +71,7 @@ export function SessionForm({ defaultValues, onRun }: SessionFormProps) {
   const statuses = Object.values(attendance);
   const count = (status: string) => statuses.filter((s) => s === status).length;
   const preview = thresholdPreviewLine(
-    thresholdFor(findRule(rules, actionType), count('present'), config.seatCount),
+    thresholdFor(ruleOrOrdinary(rules, actionType), count('present'), config.seatCount),
   );
   const attendanceMessage = errors.attendance?.root?.message ?? errors.attendance?.message;
   const attendanceError = typeof attendanceMessage === 'string' ? attendanceMessage : undefined;

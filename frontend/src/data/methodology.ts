@@ -21,7 +21,6 @@ export const METHODOLOGY = {
   limits: [
     'Outputs are hypotheses grounded in the public record, not predictions.',
     'Low-confidence records default to undecided rather than manufacturing certainty.',
-    'Citizen Portal AI recaps are flagged for verification against official minutes.',
   ],
   consentLimit:
     'Consent-routed items use an objection-risk lens because any one member may pull an item from consent.',
@@ -47,6 +46,4 @@ export const METHODOLOGY = {
       body: 'Swap the municipal dossier dataset while retaining the explainable simulator.',
     },
   ],
-  knownLimitations:
-    'Freshman members have thinner records; Janika White has frequent recusals; several Citizen Portal vote summaries remain unverified against official minutes.',
 } as const;

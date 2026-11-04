@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SESSION_DEFAULTS } from '@/data/session-defaults';
+import type { SessionDefaults } from '@/lib/council-profile';
 import type { Member } from '@/types/member';
 import {
   ACTION_TYPES,
@@ -29,9 +29,9 @@ export const sessionSchema = z.object({
     .refine((a) => Object.values(a).includes('present'), 'Mark at least one member present.'),
 }) satisfies z.ZodType<SessionInput>;
 
-export function defaultSessionValues(members: Member[]): SessionInput {
+export function defaultSessionValues(members: Member[], defaults: SessionDefaults): SessionInput {
   return {
-    ...SESSION_DEFAULTS,
+    ...defaults,
     districts: members[0] ? [members[0].district] : [],
     attendance: Object.fromEntries(members.map((m) => [m.id, 'present' as const])),
   };

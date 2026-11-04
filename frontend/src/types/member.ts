@@ -49,7 +49,6 @@ export const memberSchema = z.object({
   bio: z.string(),
   voting_bloc: z.string(),
   committees: z.record(z.string(), z.string()),
-  /** Keyed by category id, e.g. "economic_development_pilots". */
   issue_positions: z.record(z.string(), issuePositionSchema),
   key_votes: z.array(keyVoteSchema),
   notable_quotes: z.array(notableQuoteSchema),
@@ -60,8 +59,6 @@ export const memberSchema = z.object({
   political_style: z.union([z.string(), politicalStyleSchema]),
   twin_voice: z.union([z.string(), twinVoiceSchema]),
 });
-
-export const memberListSchema = z.array(memberSchema);
 
 export type Member = z.infer<typeof memberSchema>;
 export type MemberId = Member['id'];
