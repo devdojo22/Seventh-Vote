@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { listReviewHistory, listVersions } from './dossier-api';
+import { ARCHIVE_ACTION_LABELS } from '@/data/dossier-options';
+import { listArchiveHistory, listReviewHistory, listVersions } from './dossier-api';
 import { ReviewStatusBadge, VersionBadge } from './DossierBadges';
 import { formatDateTime } from './dossier-format';
 import { LoadError, LoadingText } from './DossierStates';
@@ -50,6 +51,49 @@ export function VersionHistory({ dossierId }: { dossierId: string }) {
           >
             {v.isCurrent ? 'View current' : 'View version'}
           </Link>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Who archived or restored the dossier, newest first. */
+export function ArchiveHistory({ dossierId }: { dossierId: string }) {
+  const authorName = useAuthorName();
+  const fetchHistory = useCallback(() => listArchiveHistory(dossierId), [dossierId]);
+  const { loaded, reload } = useLoad(fetchHistory);
+
+  if (loaded.state === 'loading') return <LoadingText>Loading archive history…</LoadingText>;
+  if (loaded.state === 'error') {
+    return (
+      <LoadError
+        title="Archive history couldn’t be loaded"
+        message={loaded.message}
+        onRetry={reload}
+      />
+    );
+  }
+  if (loaded.data.length === 0) {
+    return (
+      <EmptyState title="No archive changes yet">
+        Archiving and restoring will be listed here, with who did it and when.
+      </EmptyState>
+    );
+  }
+  return (
+    <ol className="relative space-y-4 border-l border-line pl-5" aria-label="Archive history">
+      {loaded.data.map((e) => (
+        <li key={e.id} className="relative">
+          <span
+            aria-hidden="true"
+            className="absolute top-4 -left-[23.5px] size-2 rounded-full bg-gold ring-4 ring-paper"
+          />
+          <div className="space-y-1 rounded-2xl border border-line bg-white p-4 shadow-card">
+            <p className="text-[13px] font-semibold text-navy">{ARCHIVE_ACTION_LABELS[e.action]}</p>
+            <p className="text-[11px] font-medium text-muted">
+              {formatDateTime(e.performedAt)} · {authorName(e.performedBy)}
+            </p>
+          </div>
         </li>
       ))}
     </ol>

@@ -1,39 +1,32 @@
 import { describeAccessError } from '@/features/access/access-errors';
 import { ApiError } from '@/lib/api/http';
 
-/** List items are numbered from 1; DRF reports them by index, as an array or as "0", "1"… keys. */
-function fieldLabel(path: (string | number)[]): string {
-  return path
-    .map((part) => (/^\d+$/.test(String(part)) ? `#${String(Number(part) + 1)}` : part))
-    .join(' › ');
+export interface ValidationIssue {
+  path: string[];
+  message: string;
 }
 
-/** The first message in Django REST framework's nested validation details, with where it applies. */
-function firstValidationMessage(details: unknown, path: (string | number)[] = []): string | null {
-  if (typeof details === 'string') {
-    return path.length > 0 ? `${fieldLabel(path)}: ${details}` : details;
-  }
+/** Every message in Django REST framework's nested validation details, with where it applies. List
+ * items are reported by index, as an array or as "0", "1"… keys. */
+function validationIssues(details: unknown, path: string[] = []): ValidationIssue[] {
+  if (typeof details === 'string') return [{ path, message: details }];
   if (Array.isArray(details)) {
-    for (const [index, item] of details.entries()) {
-      // A list of messages for one field, or a list of per-item error objects.
-      const found = firstValidationMessage(
-        item,
-        typeof item === 'string' ? path : [...path, index],
-      );
-      if (found) return found;
-    }
-    return null;
+    // A list of messages for one field, or a list of per-item error objects.
+    return details.flatMap((item, index) =>
+      validationIssues(item, typeof item === 'string' ? path : [...path, String(index)]),
+    );
   }
   if (typeof details === 'object' && details !== null) {
-    for (const [key, value] of Object.entries(details)) {
-      const found = firstValidationMessage(
-        value,
-        key === 'non_field_errors' ? path : [...path, key],
-      );
-      if (found) return found;
-    }
+    return Object.entries(details).flatMap(([key, value]) =>
+      validationIssues(value, key === 'non_field_errors' ? path : [...path, key]),
+    );
   }
-  return null;
+  return [];
+}
+
+/** The fields a save was refused for, in the order the API reports them. */
+export function serverValidationIssues(error: unknown): ValidationIssue[] {
+  return error instanceof ApiError && error.status === 400 ? validationIssues(error.details) : [];
 }
 
 export function currentVersionFromConflict(error: unknown): number | null {
@@ -58,7 +51,8 @@ export function describeDossierError(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) {
       return (
-        firstValidationMessage(error.details) ?? 'Some details weren’t accepted. Review the form.'
+        serverValidationIssues(error)[0]?.message ??
+        'Some details weren’t accepted. Review the form.'
       );
     }
     if (error.status === 404) {

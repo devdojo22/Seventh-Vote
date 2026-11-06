@@ -189,3 +189,22 @@ class ReviewStatusChange(models.Model):
     class Meta:
         db_table = "review_status_changes"
         ordering = ["-changed_at"]
+
+
+class DossierArchiveEvent(models.Model):
+    """Append-only log of who archived or restored a dossier, and when. Written only by services.py, in the
+    same transaction as the change."""
+
+    class Action(models.TextChoices):
+        ARCHIVED = "archived", "Archived"
+        RESTORED = "restored", "Restored"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dossier = models.ForeignKey(Dossier, on_delete=models.PROTECT, related_name="archive_events")
+    action = models.CharField(max_length=20, choices=Action.choices)
+    performed_by = models.UUIDField()
+    performed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "dossier_archive_events"
+        ordering = ["-performed_at"]

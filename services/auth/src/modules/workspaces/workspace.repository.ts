@@ -53,6 +53,9 @@ async function deleteAppData(tx: Prisma.TransactionClient, workspaceId: string):
       SELECT v.id FROM app.dossier_versions v JOIN app.dossiers d ON d.id = v.dossier_id
       WHERE d.workspace_id = ${workspaceId}::uuid)`;
   await tx.$executeRaw`
+    DELETE FROM app.dossier_archive_events WHERE dossier_id IN (
+      SELECT id FROM app.dossiers WHERE workspace_id = ${workspaceId}::uuid)`;
+  await tx.$executeRaw`
     DELETE FROM app.dossier_versions WHERE dossier_id IN (
       SELECT id FROM app.dossiers WHERE workspace_id = ${workspaceId}::uuid)`;
   await tx.$executeRaw`DELETE FROM app.dossiers WHERE workspace_id = ${workspaceId}::uuid`;

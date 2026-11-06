@@ -3,6 +3,7 @@ from rest_framework import serializers
 from council.models import (
     DatePrecision,
     Dossier,
+    DossierArchiveEvent,
     DossierVersion,
     KeyRecord,
     Member,
@@ -294,6 +295,15 @@ class ReviewStatusChangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReviewStatusChange
         fields = ["id", "versionNo", "fromStatus", "toStatus", "changedBy", "changedAt"]
+
+
+class DossierArchiveEventSerializer(serializers.ModelSerializer):
+    performedBy = serializers.UUIDField(source="performed_by")
+    performedAt = serializers.DateTimeField(source="performed_at")
+
+    class Meta:
+        model = DossierArchiveEvent
+        fields = ["id", "action", "performedBy", "performedAt"]
 
 
 class KeyRecordEvidenceSerializer(KeyRecordSerializer):

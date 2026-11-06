@@ -6,6 +6,11 @@ urlpatterns = [
     path("dossiers", views.DossierListCreateView.as_view(), name="dossier-list"),
     path("dossiers/<uuid:pk>", views.DossierDetailView.as_view(), name="dossier-detail"),
     path("dossiers/<uuid:pk>/restore", views.DossierRestoreView.as_view(), name="dossier-restore"),
+    path(
+        "dossiers/<uuid:pk>/archive-history",
+        views.DossierArchiveHistoryView.as_view(),
+        name="dossier-archive-history",
+    ),
     path("dossiers/<uuid:pk>/versions", views.DossierVersionListView.as_view(), name="dossier-versions"),
     path(
         "dossiers/<uuid:pk>/versions/<int:version_no>",

@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from council import errors
-from council.models import Dossier, DossierVersion, KeyRecord, Member, VoiceQuote
+from council.models import Dossier, DossierArchiveEvent, DossierVersion, KeyRecord, Member, VoiceQuote
 
 IDENTITY_FIELDS = ("name", "initials", "district", "leadership_role", "took_office")
 _GENERATIONAL_SUFFIXES = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv"}
@@ -137,15 +137,26 @@ def save_dossier(
     return locked
 
 
-def archive_dossier(dossier: Dossier) -> None:
-    """Soft delete: the member is archived, every version stays. Archiving twice is a no-op."""
-    Member.objects.filter(pk=dossier.member_id, archived_at__isnull=True).update(
+@transaction.atomic
+def archive_dossier(dossier: Dossier, user_id: str) -> None:
+    """Soft delete: the member is archived, every version stays. Archiving twice is a no-op, and logs nothing."""
+    archived = Member.objects.filter(pk=dossier.member_id, archived_at__isnull=True).update(
         archived_at=timezone.now(), updated_at=timezone.now()
     )
+    if archived:
+        DossierArchiveEvent.objects.create(
+            dossier=dossier, action=DossierArchiveEvent.Action.ARCHIVED, performed_by=user_id
+        )
 
 
-def restore_dossier(dossier: Dossier) -> None:
-    """Undo an archive: the member is active and editable again. Restoring an active member is a no-op."""
-    Member.objects.filter(pk=dossier.member_id, archived_at__isnull=False).update(
+@transaction.atomic
+def restore_dossier(dossier: Dossier, user_id: str) -> None:
+    """Undo an archive: the member is active and editable again. Restoring an active member is a no-op, and
+    logs nothing."""
+    restored = Member.objects.filter(pk=dossier.member_id, archived_at__isnull=False).update(
         archived_at=None, updated_at=timezone.now()
     )
+    if restored:
+        DossierArchiveEvent.objects.create(
+            dossier=dossier, action=DossierArchiveEvent.Action.RESTORED, performed_by=user_id
+        )

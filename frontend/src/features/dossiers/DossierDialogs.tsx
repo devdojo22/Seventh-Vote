@@ -109,6 +109,33 @@ export function ReviewStatusDialog({
   );
 }
 
+export function UnsavedChangesDialog({
+  onStay,
+  onLeave,
+}: {
+  onStay: () => void;
+  onLeave: () => void;
+}) {
+  return (
+    <Modal labelledBy="unsaved-changes-title" onClose={onStay}>
+      <div className="grid gap-4 p-5 sm:p-6">
+        <h2 id="unsaved-changes-title" className="font-display text-xl font-bold text-navy">
+          Unsaved changes
+        </h2>
+        <p className="text-sm leading-relaxed text-muted">
+          You have unsaved changes. Are you sure you want to leave this page?
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={onStay} data-autofocus>
+            Stay on page
+          </Button>
+          <Button onClick={onLeave}>Leave page</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function ArchiveDossierDialog({
   name,
   busy,

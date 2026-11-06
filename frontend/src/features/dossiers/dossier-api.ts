@@ -3,6 +3,7 @@ import { withAccessToken } from '@/features/auth/auth-session';
 import { apiRequest } from '@/lib/api/http';
 import { useCouncilStore } from '@/stores/council-store';
 import {
+  ARCHIVE_ACTIONS,
   DATE_PRECISIONS,
   RECORD_OUTCOMES,
   RECORD_TYPES,
@@ -10,7 +11,6 @@ import {
   STANCE_LABELS,
   type ReviewStatus,
 } from '@/types/dossier';
-
 
 const timestamp = z.iso.datetime({ offset: true });
 const source = { sourceName: z.string(), sourceUrl: z.string() };
@@ -137,6 +137,14 @@ const reviewChangeSchema = z.object({
 });
 export type ReviewChange = z.infer<typeof reviewChangeSchema>;
 
+const archiveEventSchema = z.object({
+  id: z.guid(),
+  action: z.enum(ARCHIVE_ACTIONS),
+  performedBy: z.guid(),
+  performedAt: timestamp,
+});
+export type ArchiveEvent = z.infer<typeof archiveEventSchema>;
+
 const evidenceSchema = z.discriminatedUnion('kind', [
   issuePositionSchema.extend({ kind: z.literal('issue_position') }),
   keyRecordSchema.extend({ kind: z.literal('key_record') }),
@@ -248,7 +256,6 @@ export function getVersion(id: string, versionNo: number): Promise<DossierVersio
   );
 }
 
-
 export function setReviewStatus(
   id: string,
   status: ReviewStatus,
@@ -270,6 +277,16 @@ export function listReviewHistory(id: string): Promise<ReviewChange[]> {
       method: 'GET',
       bearer,
       schema: z.array(reviewChangeSchema),
+    }),
+  );
+}
+
+export function listArchiveHistory(id: string): Promise<ArchiveEvent[]> {
+  return withAccessToken((bearer) =>
+    apiRequest(`${dossierPath(id)}/archive-history`, {
+      method: 'GET',
+      bearer,
+      schema: z.array(archiveEventSchema),
     }),
   );
 }

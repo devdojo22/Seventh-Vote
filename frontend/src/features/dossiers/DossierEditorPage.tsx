@@ -1,14 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   useFieldArray,
   useForm,
   type Control,
   type FieldErrors,
+  type FieldPath,
   type UseFormRegister,
   type UseFormRegisterReturn,
 } from 'react-hook-form';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useBlocker, useNavigate, useParams } from 'react-router';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Callout } from '@/components/ui/Callout';
@@ -32,13 +33,19 @@ import {
   STANCE_LABELS,
 } from '@/types/dossier';
 import { createDossier, getDossier, saveDossier, type DossierDetail } from './dossier-api';
-import { currentVersionFromConflict, describeDossierError } from './dossier-errors';
+import { UnsavedChangesDialog } from './DossierDialogs';
+import {
+  currentVersionFromConflict,
+  describeDossierError,
+  serverValidationIssues,
+} from './dossier-errors';
 import { issueLabel } from './dossier-format';
 import {
   CHANGE_NOTE_MAX,
   dossierFormSchema,
   fromFormValues,
   sameContent,
+  toFormField,
   toFormValues,
   type DossierFormValues,
 } from './dossier-form';
@@ -48,6 +55,11 @@ import { useDossierAccess } from './use-dossier-access';
 import { useLoad } from './use-load';
 
 type Errors = FieldErrors<DossierFormValues>;
+
+interface FormError {
+  message: ReactNode;
+  field: FieldPath<DossierFormValues> | null;
+}
 
 const REMOVE_BUTTON_CLASS =
   'grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-brick-bg hover:text-brick focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none';
@@ -327,8 +339,10 @@ function BulletEditor({
 function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
   const navigate = useNavigate();
   const showToast = useAppStore((s) => s.showToast);
-  const [formError, setFormError] = useState<ReactNode>(null);
+  const [formError, setFormError] = useState<FormError | null>(null);
   const [defaults] = useState(() => toFormValues(dossier?.currentVersion ?? null));
+  const errorBanner = useRef<HTMLDivElement>(null);
+  const saved = useRef(false);
   // The version this edit started from; the server refuses the save if someone saved after it.
   const baseVersionNo = dossier?.currentVersion.versionNo ?? 0;
 
@@ -336,11 +350,23 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
     control,
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    setError,
+    setFocus,
+    formState: { errors, isDirty, isSubmitting },
   } = useForm<DossierFormValues>({
     resolver: zodResolver(dossierFormSchema),
     defaultValues: defaults,
   });
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isDirty && !saved.current && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  useEffect(() => {
+    if (formError?.field) setFocus(formError.field);
+    else if (formError) errorBanner.current?.scrollIntoView({ block: 'center' });
+  }, [formError, setFocus]);
+
   const committees = useFieldArray({ control, name: 'committees' });
   const positions = useFieldArray({ control, name: 'issuePositions' });
   const records = useFieldArray({ control, name: 'keyRecords' });
@@ -365,42 +391,65 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
     try {
       if (!dossier) {
         const created = await createDossier(content, values.changeNote);
+        saved.current = true;
         showToast('Dossier created as version 1');
         await navigate(`/dossiers/${created.id}`);
         return;
       }
       if (sameContent(content, fromFormValues(toFormValues(dossier.currentVersion)))) {
-        setFormError('Nothing has changed yet, so there is no new version to save.');
+        setFormError({
+          message: 'Nothing has changed yet, so there is no new version to save.',
+          field: null,
+        });
         return;
       }
-      const saved = await saveDossier(dossier.id, baseVersionNo, content, values.changeNote);
-      showToast(`Saved as version ${String(saved.currentVersion.versionNo)}`);
+      const updated = await saveDossier(dossier.id, baseVersionNo, content, values.changeNote);
+      saved.current = true;
+      showToast(`Saved as version ${String(updated.currentVersion.versionNo)}`);
       await navigate(`/dossiers/${dossier.id}`);
     } catch (error) {
       const newer = currentVersionFromConflict(error);
-      setFormError(
-        newer !== null && dossier ? (
-          <>
-            Someone saved version {newer} while you were editing, so this edit wasn’t saved. Your
-            changes are still in the form.{' '}
-            <Link
-              to={`/dossiers/${dossier.id}?tab=versions`}
-              target="_blank"
-              className="font-semibold underline"
-            >
-              Open the latest version
-            </Link>{' '}
-            in a new tab, then reload this page and apply your changes again.
-          </>
-        ) : (
-          describeDossierError(error)
-        ),
-      );
+      const fields = serverValidationIssues(error).flatMap(({ path, message }) => {
+        const field = toFormField(path);
+        return field ? [{ field, message }] : [];
+      });
+      fields.forEach(({ field, message }) => setError(field, { type: 'server', message }));
+      setFormError({
+        field: fields[0]?.field ?? null,
+        message:
+          newer !== null && dossier ? (
+            <>
+              Someone saved version {newer} while you were editing, so this edit wasn’t saved. Your
+              changes are still in the form.{' '}
+              <Link
+                to={`/dossiers/${dossier.id}?tab=versions`}
+                target="_blank"
+                className="font-semibold underline"
+              >
+                Open the latest version
+              </Link>{' '}
+              in a new tab, then reload this page and apply your changes again.
+            </>
+          ) : (
+            describeDossierError(error)
+          ),
+      });
     }
   };
 
   return (
-    <form noValidate className="grid gap-5" onSubmit={(e) => void handleSubmit(onValid)(e)}>
+    <form
+      noValidate
+      className="grid gap-5"
+      onSubmit={(e) => void handleSubmit(onValid, () => setFormError(null))(e)}
+    >
+      {formError && (
+        <div ref={errorBanner}>
+          <Callout title="Not saved">
+            <span role="alert">{formError.message}</span>
+          </Callout>
+        </div>
+      )}
       <Callout title="Shared with everyone in this workspace">
         <span className="flex items-start gap-2">
           <LockIcon className="mt-0.5 size-3.5 shrink-0 text-gold" />
@@ -434,18 +483,21 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
             id="district"
             label="District or seat"
             registration={register('district')}
+            error={errors.district?.message}
             placeholder="e.g. District 1"
           />
           <TextField
             id="tookOffice"
             label="Took office"
             registration={register('tookOffice')}
+            error={errors.tookOffice?.message}
             placeholder="e.g. 2019"
           />
           <TextField
             id="leadershipRole"
             label="Leadership role"
             registration={register('leadershipRole')}
+            error={errors.leadershipRole?.message}
             placeholder="e.g. Vice Chair, or None"
             className="sm:col-span-2"
           />
@@ -453,7 +505,13 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
       </FormSection>
 
       <FormSection title="Profile">
-        <TextField id="profile" label="Biography" rows={5} registration={register('profile')} />
+        <TextField
+          id="profile"
+          label="Biography"
+          rows={5}
+          registration={register('profile')}
+          error={errors.profile?.message}
+        />
         <TextField
           id="politicalArchetype"
           label="Political archetype"
@@ -466,6 +524,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
           label="Political style"
           rows={2}
           registration={register('politicalStyle')}
+          error={errors.politicalStyle?.message}
         />
       </FormSection>
 
@@ -500,12 +559,14 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
                   id={`committee-role-${String(index)}`}
                   label="Role"
                   registration={register(`committees.${index}.role`)}
+                  error={errors.committees?.[index]?.role?.message}
                   placeholder="e.g. Chair"
                 />
                 <TextField
                   id={`committee-year-${String(index)}`}
                   label="Year"
                   registration={register(`committees.${index}.year`)}
+                  error={errors.committees?.[index]?.year?.message}
                   placeholder="e.g. 2026"
                 />
               </div>
@@ -567,12 +628,14 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
                   label="Stance"
                   rows={2}
                   registration={register(`issuePositions.${index}.stance`)}
+                  error={e?.stance?.message}
                 />
                 <TextField
                   id={`${id}-evidence`}
                   label="Evidence"
                   rows={2}
                   registration={register(`issuePositions.${index}.evidence`)}
+                  error={e?.evidence?.message}
                   hint="What the source shows, in a sentence or two."
                 />
                 <SourceFields
@@ -662,6 +725,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
                     id={`${id}-date-text`}
                     label="Date as written"
                     registration={register(`keyRecords.${index}.dateText`)}
+                    error={e?.dateText?.message}
                     placeholder="e.g. Spring 2025"
                   />
                 </div>
@@ -670,6 +734,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
                   label="Description"
                   rows={2}
                   registration={register(`keyRecords.${index}.description`)}
+                  error={e?.description?.message}
                 />
                 <SourceFields
                   id={id}
@@ -708,6 +773,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
           label="Speaking style"
           rows={2}
           registration={register('voiceDescription')}
+          error={errors.voiceDescription?.message}
         />
         <div className="grid gap-3 rounded-xl border border-line p-4">
           <strong className="text-[11px] font-bold tracking-wide text-muted uppercase">
@@ -719,12 +785,14 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
               label="Example quote"
               rows={2}
               registration={register('voiceExample.quote')}
+              error={errors.voiceExample?.quote?.message}
             />
             <TextField
               id="voice-example-context"
               label="Context"
               rows={2}
               registration={register('voiceExample.context')}
+              error={errors.voiceExample?.context?.message}
             />
           </div>
           <SourceFields
@@ -759,6 +827,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
                   id={`${id}-context`}
                   label="Context"
                   registration={register(`quotes.${index}.context`)}
+                  error={e?.context?.message}
                   placeholder="e.g. Budget hearing, May 2026"
                 />
                 <Checkbox label="Verbatim quote" {...register(`quotes.${index}.verbatim`)} />
@@ -775,7 +844,12 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
       </FormSection>
 
       <FormSection title="Decision pattern">
-        <TextField id="votingBloc" label="Voting bloc" registration={register('votingBloc')} />
+        <TextField
+          id="votingBloc"
+          label="Voting bloc"
+          registration={register('votingBloc')}
+          error={errors.votingBloc?.message}
+        />
         <div className="grid gap-5 lg:grid-cols-2">
           <BulletEditor
             name="oppositionTriggers"
@@ -802,6 +876,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
             id="mayor-relationship"
             label="Relationship"
             registration={register('mayorAlignment.relationship')}
+            error={errors.mayorAlignment?.relationship?.message}
             placeholder="e.g. Cooperative, Independent, Skeptical"
           />
           <TextField
@@ -809,6 +884,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
             label="Example"
             rows={2}
             registration={register('mayorAlignment.example')}
+            error={errors.mayorAlignment?.example?.message}
           />
         </div>
         <SourceFields
@@ -891,11 +967,6 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
               : 'e.g. First draft from news sources.'
           }
         />
-        {formError && (
-          <Callout title="Not saved">
-            <span role="alert">{formError}</span>
-          </Callout>
-        )}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Link
             to={dossier ? `/dossiers/${dossier.id}` : '/dossiers'}
@@ -908,6 +979,9 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
           </Button>
         </div>
       </Card>
+      {blocker.state === 'blocked' && (
+        <UnsavedChangesDialog onStay={blocker.reset} onLeave={blocker.proceed} />
+      )}
     </form>
   );
 }

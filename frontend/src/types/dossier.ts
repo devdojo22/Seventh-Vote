@@ -4,6 +4,10 @@
 export const REVIEW_STATUSES = ['draft', 'in_review', 'approved'] as const;
 export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
+/** What an entry in a dossier's archive history records. */
+export const ARCHIVE_ACTIONS = ['archived', 'restored'] as const;
+export type ArchiveAction = (typeof ARCHIVE_ACTIONS)[number];
+
 /** Nullable on an issue position until the client confirms the label set. */
 export const STANCE_LABELS = [
   'support',

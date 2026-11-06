@@ -1,4 +1,5 @@
 import type {
+  ArchiveAction,
   DatePrecision,
   EvidenceKind,
   RecordOutcome,
@@ -6,6 +7,11 @@ import type {
   ReviewStatus,
   StanceLabelValue,
 } from '@/types/dossier';
+
+export const ARCHIVE_ACTION_LABELS: Record<ArchiveAction, string> = {
+  archived: 'Archived',
+  restored: 'Restored',
+};
 
 export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
   draft: 'Draft',

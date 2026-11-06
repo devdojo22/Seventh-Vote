@@ -20,7 +20,7 @@ import { DossierContentView } from './DossierContentView';
 import { ArchiveDossierDialog, ReviewStatusDialog } from './DossierDialogs';
 import { currentVersionFromConflict, describeDossierError } from './dossier-errors';
 import { formatDateTime } from './dossier-format';
-import { ReviewHistory, VersionHistory } from './DossierHistory';
+import { ArchiveHistory, ReviewHistory, VersionHistory } from './DossierHistory';
 import { BackLink, DossierNotAvailable, LoadError, LoadingText } from './DossierStates';
 import { EvidenceTab } from './EvidenceList';
 import { PRIMARY_LINK_CLASS } from './link-classes';
@@ -32,6 +32,7 @@ const TABS = [
   { id: 'evidence', label: 'Evidence' },
   { id: 'versions', label: 'Version history' },
   { id: 'review', label: 'Review history' },
+  { id: 'archive', label: 'Archive history' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -119,7 +120,7 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
       },
     );
 
-  const onRestore = () => void run(() => restoreDossier(dossier.id), 'Dossier restored', onChanged);
+  const onRestore = () => void run(() => restoreDossier(dossier.id), 'Dossier restored', reloadAll);
 
   return (
     <section className="space-y-6">
@@ -216,6 +217,7 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
         {tab === 'evidence' && <EvidenceTab dossierId={dossier.id} />}
         {tab === 'versions' && <VersionHistory key={revision} dossierId={dossier.id} />}
         {tab === 'review' && <ReviewHistory key={revision} dossierId={dossier.id} />}
+        {tab === 'archive' && <ArchiveHistory key={revision} dossierId={dossier.id} />}
       </div>
 
       {canEdit && (

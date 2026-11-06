@@ -1,3 +1,4 @@
+import type { FieldPath } from 'react-hook-form';
 import { z } from 'zod';
 import { isHttpUrl } from '@/lib/url';
 import {
@@ -185,6 +186,28 @@ export function fromFormValues(v: DossierFormValues): DossierContentInput {
     mayorAlignment: v.mayorAlignment,
     dataGaps: v.dataGaps.map((g) => g.value),
   };
+}
+
+function isFormField(name: string): name is FieldPath<DossierFormValues> {
+  return (name.split('.', 1)[0] ?? '') in toFormValues(null);
+}
+
+
+export function toFormField(path: string[]): FieldPath<DossierFormValues> | null {
+  const [root, section, ...rest] = path;
+  if (root === 'changeNote') return 'changeNote';
+  if (root !== 'content' || section === undefined || path.at(-1) === 'lineageId') return null;
+
+  let parts = [section, ...rest];
+  if (section === 'decisionPattern') parts = rest;
+  if (section === 'dataGaps') parts = [...parts, 'value'];
+  if (section === 'voiceEvidence') {
+    const [part, ...more] = rest;
+    if (part === 'description') parts = ['voiceDescription'];
+    else parts = [part === 'example' ? 'voiceExample' : 'quotes', ...more];
+  }
+  const name = parts.join('.');
+  return isFormField(name) ? name : null;
 }
 
 export function sameContent(a: DossierContentInput, b: DossierContentInput): boolean {

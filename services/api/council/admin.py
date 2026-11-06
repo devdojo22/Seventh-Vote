@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from council.models import Dossier, DossierVersion, KeyRecord, Member, ReviewStatusChange, VoiceQuote
+from council.models import (
+    Dossier,
+    DossierArchiveEvent,
+    DossierVersion,
+    KeyRecord,
+    Member,
+    ReviewStatusChange,
+    VoiceQuote,
+)
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
@@ -88,3 +96,9 @@ class VoiceQuoteAdmin(ReadOnlyAdmin):
 class ReviewStatusChangeAdmin(ReadOnlyAdmin):
     list_display = ["version", "from_status", "to_status", "changed_by", "changed_at"]
     list_filter = ["to_status"]
+
+
+@admin.register(DossierArchiveEvent)
+class DossierArchiveEventAdmin(ReadOnlyAdmin):
+    list_display = ["dossier", "action", "performed_by", "performed_at"]
+    list_filter = ["action"]

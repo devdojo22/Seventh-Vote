@@ -6,8 +6,9 @@ from rest_framework.views import APIView
 
 from core.permissions import HasWorkspacePermission
 from council import review, services
-from council.models import Dossier, DossierVersion, ReviewStatusChange
+from council.models import Dossier, DossierArchiveEvent, DossierVersion, ReviewStatusChange
 from council.serializers import (
+    DossierArchiveEventSerializer,
     DossierCreateSerializer,
     DossierDetailSerializer,
     DossierListSerializer,
@@ -127,7 +128,7 @@ class DossierDetailView(DossierPermissionsMixin, generics.RetrieveUpdateDestroyA
         return Response(DossierDetailSerializer(saved).data)
 
     def perform_destroy(self, instance):
-        services.archive_dossier(instance)
+        services.archive_dossier(instance, self.request.user.user_id)
 
 
 class DossierRestoreView(WorkspaceDossierMixin, APIView):
@@ -136,9 +137,18 @@ class DossierRestoreView(WorkspaceDossierMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         dossier = self.get_dossier()
-        services.restore_dossier(dossier)
+        services.restore_dossier(dossier, request.user.user_id)
         dossier.member.refresh_from_db()
         return Response(DossierDetailSerializer(dossier).data)
+
+
+class DossierArchiveHistoryView(WorkspaceDossierMixin, generics.ListAPIView):
+    """GET /api/dossiers/{id}/archive-history: who archived or restored the dossier, newest first."""
+
+    serializer_class = DossierArchiveEventSerializer
+
+    def get_queryset(self):
+        return DossierArchiveEvent.objects.filter(dossier=self.get_dossier())
 
 
 # --- Step 4: version history -----------------------------------------------------------------------------
