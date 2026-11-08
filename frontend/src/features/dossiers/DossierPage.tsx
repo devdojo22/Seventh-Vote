@@ -10,6 +10,8 @@ import { useAppStore } from '@/stores/app-store';
 import type { ReviewStatus } from '@/types/dossier';
 import {
   archiveDossier,
+  dossierHref,
+  dossierRef,
   getDossier,
   restoreDossier,
   setReviewStatus,
@@ -139,7 +141,7 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
               <Button variant="secondary" onClick={() => openDialog('review')}>
                 Set review status
               </Button>
-              <Link to={`/dossiers/${dossier.id}/edit`} className={PRIMARY_LINK_CLASS}>
+              <Link to={`${dossierHref(dossier)}/edit`} className={PRIMARY_LINK_CLASS}>
                 <PencilIcon className="size-4" />
                 Edit dossier
               </Link>
@@ -215,7 +217,7 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
       <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {tab === 'profile' && <DossierContentView content={version} />}
         {tab === 'evidence' && <EvidenceTab dossierId={dossier.id} />}
-        {tab === 'versions' && <VersionHistory key={revision} dossierId={dossier.id} />}
+        {tab === 'versions' && <VersionHistory key={revision} dossierId={dossierRef(dossier)} />}
         {tab === 'review' && <ReviewHistory key={revision} dossierId={dossier.id} />}
         {tab === 'archive' && <ArchiveHistory key={revision} dossierId={dossier.id} />}
       </div>

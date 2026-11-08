@@ -7,7 +7,7 @@ same serializer and service the API uses.
     python manage.py import_memphis
 
 Members already in the workspace (archived ones included) are skipped, never overwritten, so running it again
-is safe. They are matched by slug, and members added in the app (no slug) by name.
+is safe. They are matched by slug, and members added in the app (whose slug may differ) by name.
 """
 
 import json
@@ -155,11 +155,11 @@ class Command(BaseCommand):
         by_slug = set(
             Member.objects.filter(workspace_id=workspace_id, slug__in=slugs).values_list("slug", flat=True)
         )
-        # Members added in the app have no slug, so they are matched by name: the import never adds a second
-        # dossier for someone already there, and never changes the one that exists.
         added_in_app = {
             _name_key(name)
-            for name in Member.objects.filter(workspace_id=workspace_id, slug="").values_list("name", flat=True)
+            for name in Member.objects.filter(workspace_id=workspace_id)
+            .exclude(slug__in=slugs)
+            .values_list("name", flat=True)
         }
         by_name = {
             m["id"]: m["name"]

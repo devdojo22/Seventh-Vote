@@ -3,6 +3,7 @@ transaction."""
 
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
 
 from council import errors
 from council.models import Dossier, DossierArchiveEvent, DossierVersion, KeyRecord, Member, VoiceQuote
@@ -99,12 +100,25 @@ def _check_lineage(content: dict, dossier: Dossier | None) -> None:
             raise errors.unknown_lineage(path, unknown)
 
 
+def _unique_slug(workspace_id: str, name: str) -> str:
+    """The name a new member's dossier is reached by in URLs. "new" is the /dossiers/new page."""
+    base = slugify(name)[:90].strip("-") or "member"
+    taken = set(Member.objects.filter(workspace_id=workspace_id, slug__startswith=base).values_list("slug", flat=True))
+    taken.add("new")
+    slug, suffix = base, 2
+    while slug in taken:
+        slug, suffix = f"{base}-{suffix}", suffix + 1
+    return slug
+
+
 @transaction.atomic
 def create_dossier(*, workspace_id: str, user_id: str, member_data: dict, content: dict, change_note: str) -> Dossier:
     """A new member with its dossier at version 1."""
     _check_lineage(content, None)
+    identity = _identity(content)
+    slug = member_data.get("slug") or _unique_slug(workspace_id, identity["name"])
     member = Member.objects.create(
-        workspace_id=workspace_id, created_by=user_id, **_identity(content), **member_data
+        workspace_id=workspace_id, created_by=user_id, **identity, **{**member_data, "slug": slug}
     )
     dossier = Dossier.objects.create(workspace_id=workspace_id, member=member)
     dossier.current_version = _write_version(dossier, 1, content, change_note, user_id)

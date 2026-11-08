@@ -33,7 +33,7 @@ import {
   REVIEW_STATUS_STEPS,
 } from '@/data/dossier-options';
 import { REVIEW_STATUSES, type ReviewStatus } from '@/types/dossier';
-import { listDossiers, type DossierSummary } from './dossier-api';
+import { dossierHref, listDossiers, type DossierSummary } from './dossier-api';
 import { ArchivedBadge, ReviewStatusBadge } from './DossierBadges';
 import { formatDateAndTime } from './dossier-format';
 import { DossierNotAvailable, LoadError, LoadingText } from './DossierStates';
@@ -184,7 +184,7 @@ function RowMenu({ dossier, canEdit }: { dossier: DossierSummary; canEdit: boole
     };
   }, [open]);
 
-  const base = `/dossiers/${dossier.id}`;
+  const base = dossierHref(dossier);
   const items = [
     { label: 'Open dossier', to: base },
     ...(canEdit && !dossier.member.archived ? [{ label: 'Edit dossier', to: `${base}/edit` }] : []),
@@ -234,7 +234,7 @@ function DossierRow({ dossier, canEdit }: { dossier: DossierSummary; canEdit: bo
   const { member } = dossier;
   const role = member.leadershipRole && !/^none/i.test(member.leadershipRole);
   const updated = formatDateAndTime(dossier.updatedAt);
-  const href = `/dossiers/${dossier.id}`;
+  const href = dossierHref(dossier);
   return (
     <div
       className={`group relative flex flex-col gap-3 border-l-[3px] border-transparent py-4 pr-4 pl-4 transition-colors hover:border-gold hover:bg-amber-bg/45 sm:pl-5 md:pr-5 ${ROW_GRID}`}

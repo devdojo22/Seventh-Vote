@@ -32,7 +32,13 @@ import {
   RECORD_TYPES,
   STANCE_LABELS,
 } from '@/types/dossier';
-import { createDossier, getDossier, saveDossier, type DossierDetail } from './dossier-api';
+import {
+  createDossier,
+  dossierHref,
+  getDossier,
+  saveDossier,
+  type DossierDetail,
+} from './dossier-api';
 import { UnsavedChangesDialog } from './DossierDialogs';
 import {
   currentVersionFromConflict,
@@ -393,7 +399,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
         const created = await createDossier(content, values.changeNote);
         saved.current = true;
         showToast('Dossier created as version 1');
-        await navigate(`/dossiers/${created.id}`);
+        await navigate(dossierHref(created));
         return;
       }
       if (sameContent(content, fromFormValues(toFormValues(dossier.currentVersion)))) {
@@ -406,7 +412,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
       const updated = await saveDossier(dossier.id, baseVersionNo, content, values.changeNote);
       saved.current = true;
       showToast(`Saved as version ${String(updated.currentVersion.versionNo)}`);
-      await navigate(`/dossiers/${dossier.id}`);
+      await navigate(dossierHref(dossier));
     } catch (error) {
       const newer = currentVersionFromConflict(error);
       const fields = serverValidationIssues(error).flatMap(({ path, message }) => {
@@ -422,7 +428,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
               Someone saved version {newer} while you were editing, so this edit wasn’t saved. Your
               changes are still in the form.{' '}
               <Link
-                to={`/dossiers/${dossier.id}?tab=versions`}
+                to={`${dossierHref(dossier)}?tab=versions`}
                 target="_blank"
                 className="font-semibold underline"
               >
@@ -969,7 +975,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
         />
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Link
-            to={dossier ? `/dossiers/${dossier.id}` : '/dossiers'}
+            to={dossier ? dossierHref(dossier) : '/dossiers'}
             className={SECONDARY_LINK_CLASS}
           >
             Cancel
@@ -1002,7 +1008,7 @@ function EditDossier({ dossierId }: { dossierId: string }) {
   const dossier = loaded.data;
   return (
     <section className="space-y-6">
-      <BackLink to={`/dossiers/${dossier.id}`} label={dossier.member.name} />
+      <BackLink to={dossierHref(dossier)} label={dossier.member.name} />
       <PageHeader
         eyebrow="Edit dossier"
         title={dossier.member.name}

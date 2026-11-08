@@ -1,3 +1,6 @@
+import uuid
+
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
@@ -24,6 +27,14 @@ CanViewDossiers = HasWorkspacePermission.of("viewDossiers")
 CanEditDossiers = HasWorkspacePermission.of("editDossiers")
 
 
+def dossier_lookup(ref: str) -> Q:
+    """A dossier as URLs name it: by its member's slug, or by UUID so links made before slugs keep working."""
+    try:
+        return Q(pk=uuid.UUID(ref))
+    except ValueError:
+        return Q(member__slug=ref)
+
+
 class DossierPermissionsMixin:
     """Reads need viewDossiers; anything that writes needs editDossiers."""
 
@@ -33,13 +44,13 @@ class DossierPermissionsMixin:
 
 
 class WorkspaceDossierMixin(DossierPermissionsMixin):
-    """For /dossiers/{pk}/... routes: the dossier must belong to the caller's workspace, otherwise 404."""
+    """For /dossiers/{ref}/... routes: the dossier must belong to the caller's workspace, otherwise 404."""
 
     def get_dossier(self) -> Dossier:
         if not hasattr(self, "_dossier"):
             self._dossier = get_object_or_404(
                 Dossier.objects.select_related("member", "current_version"),
-                pk=self.kwargs["pk"],
+                dossier_lookup(self.kwargs["ref"]),
                 workspace_id=self.request.user.workspace_id,
             )
         return self._dossier
@@ -98,7 +109,7 @@ class DossierListCreateView(DossierPermissionsMixin, generics.ListCreateAPIView)
 # --- Step 3: retrieve / save new version / archive -------------------------------------------------------
 
 
-class DossierDetailView(DossierPermissionsMixin, generics.RetrieveUpdateDestroyAPIView):
+class DossierDetailView(WorkspaceDossierMixin, generics.RetrieveUpdateDestroyAPIView):
     """GET: the dossier with its current version (archived dossiers stay readable).
     PUT: save the full dossier as a new version; 409 if baseVersionNo is not the current version.
     DELETE: archive the member (soft delete, history kept)."""
@@ -108,10 +119,10 @@ class DossierDetailView(DossierPermissionsMixin, generics.RetrieveUpdateDestroyA
     def get_serializer_class(self):
         return DossierUpdateSerializer if self.request.method == "PUT" else DossierDetailSerializer
 
-    def get_queryset(self):
-        return Dossier.objects.filter(workspace_id=self.request.user.workspace_id).select_related(
-            "member", "current_version"
-        )
+    def get_object(self):
+        dossier = self.get_dossier()
+        self.check_object_permissions(self.request, dossier)
+        return dossier
 
     def update(self, request, *args, **kwargs):
         dossier = self.get_object()

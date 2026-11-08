@@ -164,6 +164,12 @@ export type DossierContentInput = Omit<DossierContent, 'keyRecords' | 'voiceEvid
 const DOSSIERS = '/api/dossiers';
 const dossierPath = (id: string) => `${DOSSIERS}/${encodeURIComponent(id)}`;
 
+export const dossierRef = (dossier: { id: string; member: { slug: string } }): string =>
+  dossier.member.slug || dossier.id;
+
+export const dossierHref = (dossier: { id: string; member: { slug: string } }): string =>
+  `/dossiers/${encodeURIComponent(dossierRef(dossier))}`;
+
 async function changesCouncil<T>(request: Promise<T>): Promise<T> {
   const result = await request;
   useCouncilStore.getState().markStale();

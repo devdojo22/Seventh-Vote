@@ -48,6 +48,7 @@ services:
     build: ./frontend
     environment:
       CHOKIDAR_USEPOLLING: "true"
+      PUBLIC_HOST: ${PUBLIC_HOST:-}
     volumes:
       - ./frontend:/app
       - /app/node_modules
