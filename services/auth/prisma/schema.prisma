@@ -71,6 +71,10 @@ model Workspace {
   voteMajorityThreshold Int?      @map("vote_majority_threshold")
   /// Members who must be present for business.
   voteQuorum            Int?      @map("vote_quorum")
+  /// Maximum Affiliate seats, set by a super-admin: active Affiliates plus pending Affiliate invitations.
+  /// NULL means unlimited; otherwise 0..500 (CHECK, migration 0016). The Principal never takes a seat.
+  /// Lowering it below current usage removes nothing; it only blocks new Affiliates.
+  seatLimit             Int?      @map("seat_limit")
   /// Set by a super-admin to freeze the workspace: members lose access, nothing is removed. Cleared on restore.
   archivedAt            DateTime? @map("archived_at") @db.Timestamptz(6)
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
