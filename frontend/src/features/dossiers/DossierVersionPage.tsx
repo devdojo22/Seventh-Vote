@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Link, useParams } from 'react-router';
 import { PageHeader } from '@/components/PageHeader';
 import { Callout } from '@/components/ui/Callout';
+import { Loader } from '@/components/ui/Loader';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { ApiError } from '@/lib/api/http';
 import { getDossier, getVersion } from './dossier-api';
@@ -9,7 +10,7 @@ import { ReviewStatusBadge, VersionBadge } from './DossierBadges';
 import { DossierContentView } from './DossierContentView';
 import { VersionNotFoundError } from './dossier-errors';
 import { formatDateTime } from './dossier-format';
-import { BackLink, DossierNotAvailable, LoadError, LoadingText } from './DossierStates';
+import { BackLink, DossierNotAvailable, LoadError } from './DossierStates';
 import { EvidenceTab } from './EvidenceList';
 import { useAuthorName, useDossierAccess } from './use-dossier-access';
 import { useLoad } from './use-load';
@@ -42,7 +43,7 @@ export function DossierVersionPage() {
   const historyLink = `/dossiers/${dossierId}?tab=versions`;
 
   if (!access.canView) return <DossierNotAvailable reason="no-access" />;
-  if (loaded.state === 'loading') return <LoadingText>Loading version…</LoadingText>;
+  if (loaded.state === 'loading') return <Loader label="Loading version…" />;
   if (loaded.state === 'error') {
     return (
       <section className="space-y-6">

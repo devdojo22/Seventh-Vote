@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Field } from '@/components/ui/Field';
 import { IconInput } from '@/components/ui/IconInput';
+import { Loader } from '@/components/ui/Loader';
 import { MailIcon } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api/http';
@@ -295,11 +296,7 @@ export function MembersPage() {
         </Callout>
       )}
 
-      {loaded.state === 'loading' && (
-        <p className="text-sm text-muted" aria-live="polite">
-          Loading members…
-        </p>
-      )}
+      {loaded.state === 'loading' && <Loader label="Loading members…" />}
       {loaded.state === 'error' && (
         <Callout title="Members couldn’t be loaded">
           {loaded.message}{' '}

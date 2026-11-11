@@ -36,14 +36,6 @@ export function BackLink({ to = '/dossiers', label = 'All dossiers' }) {
   );
 }
 
-export function LoadingText({ children }: { children: string }) {
-  return (
-    <p className="text-sm text-muted" aria-live="polite">
-      {children}
-    </p>
-  );
-}
-
 export function LoadError({
   title,
   message,

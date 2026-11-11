@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Loader } from '@/components/ui/Loader';
 import { ARCHIVE_ACTION_LABELS } from '@/data/dossier-options';
 import { listArchiveHistory, listReviewHistory, listVersions } from './dossier-api';
 import { ReviewStatusBadge, VersionBadge } from './DossierBadges';
 import { formatDateTime } from './dossier-format';
-import { LoadError, LoadingText } from './DossierStates';
+import { LoadError } from './DossierStates';
 import { SMALL_BUTTON_CLASS } from './link-classes';
 import { useAuthorName } from './use-dossier-access';
 import { useLoad } from './use-load';
@@ -16,7 +17,7 @@ export function VersionHistory({ dossierId }: { dossierId: string }) {
   const fetchVersions = useCallback(() => listVersions(dossierId), [dossierId]);
   const { loaded, reload } = useLoad(fetchVersions);
 
-  if (loaded.state === 'loading') return <LoadingText>Loading versions…</LoadingText>;
+  if (loaded.state === 'loading') return <Loader label="Loading versions…" />;
   if (loaded.state === 'error') {
     return (
       <LoadError title="Versions couldn’t be loaded" message={loaded.message} onRetry={reload} />
@@ -63,7 +64,7 @@ export function ArchiveHistory({ dossierId }: { dossierId: string }) {
   const fetchHistory = useCallback(() => listArchiveHistory(dossierId), [dossierId]);
   const { loaded, reload } = useLoad(fetchHistory);
 
-  if (loaded.state === 'loading') return <LoadingText>Loading archive history…</LoadingText>;
+  if (loaded.state === 'loading') return <Loader label="Loading archive history…" />;
   if (loaded.state === 'error') {
     return (
       <LoadError
@@ -106,7 +107,7 @@ export function ReviewHistory({ dossierId }: { dossierId: string }) {
   const fetchHistory = useCallback(() => listReviewHistory(dossierId), [dossierId]);
   const { loaded, reload } = useLoad(fetchHistory);
 
-  if (loaded.state === 'loading') return <LoadingText>Loading review history…</LoadingText>;
+  if (loaded.state === 'loading') return <Loader label="Loading review history…" />;
   if (loaded.state === 'error') {
     return (
       <LoadError

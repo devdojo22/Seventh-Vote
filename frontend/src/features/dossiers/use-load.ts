@@ -6,6 +6,8 @@ export type Loaded<T> =
 
 const LOADING = { state: 'loading' } as const;
 
+const MIN_LOADING_MS = 500;
+
 
 export function useLoad<T>(fetcher: () => Promise<T>): { loaded: Loaded<T>; reload: () => void } {
   const [attempt, setAttempt] = useState(0);
@@ -17,22 +19,21 @@ export function useLoad<T>(fetcher: () => Promise<T>): { loaded: Loaded<T>; relo
 
   useEffect(() => {
     let active = true;
+    let timer: number | undefined;
+    const startedAt = Date.now();
+    const settle = (loaded: Loaded<T>) => {
+      const remaining = Math.max(MIN_LOADING_MS - (Date.now() - startedAt), 0);
+      timer = window.setTimeout(() => {
+        if (active) setResult({ fetcher, attempt, loaded });
+      }, remaining);
+    };
     fetcher().then(
-      (data) => {
-        if (active) setResult({ fetcher, attempt, loaded: { state: 'ready', data } });
-      },
-      (error: unknown) => {
-        if (active) {
-          setResult({
-            fetcher,
-            attempt,
-            loaded: { state: 'error', message: describeDossierError(error) },
-          });
-        }
-      },
+      (data) => settle({ state: 'ready', data }),
+      (error: unknown) => settle({ state: 'error', message: describeDossierError(error) }),
     );
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [fetcher, attempt]);
 

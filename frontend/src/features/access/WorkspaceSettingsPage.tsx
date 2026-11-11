@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Callout } from '@/components/ui/Callout';
 import { Card } from '@/components/ui/Card';
 import { CONTROL_CLASS, Field } from '@/components/ui/Field';
+import { Loader } from '@/components/ui/Loader';
 import { useAppStore } from '@/stores/app-store';
 import { getWorkspaceSettings, updateVoteRules, type WorkspaceSettings } from './access-api';
 import { describeAccessError } from './access-errors';
@@ -186,11 +187,7 @@ export function WorkspaceSettingsPage() {
         description="How this council votes: the size of the body, the votes needed to pass, and the quorum. Each workspace has its own rules."
       />
 
-      {loaded.state === 'loading' && (
-        <p className="text-sm text-muted" aria-live="polite">
-          Loading settings…
-        </p>
-      )}
+      {loaded.state === 'loading' && <Loader label="Loading settings…" />}
       {loaded.state === 'error' && (
         <Callout title="Settings couldn’t be loaded">{loaded.message}</Callout>
       )}

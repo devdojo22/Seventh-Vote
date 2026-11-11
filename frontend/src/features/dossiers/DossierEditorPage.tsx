@@ -16,6 +16,7 @@ import { Callout } from '@/components/ui/Callout';
 import { Card } from '@/components/ui/Card';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { CONTROL_CLASS, Field } from '@/components/ui/Field';
+import { Loader } from '@/components/ui/Loader';
 import { CloseIcon, LockIcon, PlusIcon } from '@/components/ui/icons';
 import { CATEGORY_LABELS } from '@/data/agenda';
 import {
@@ -55,7 +56,7 @@ import {
   toFormValues,
   type DossierFormValues,
 } from './dossier-form';
-import { BackLink, DossierNotAvailable, LoadError, LoadingText } from './DossierStates';
+import { BackLink, DossierNotAvailable, LoadError } from './DossierStates';
 import { SECONDARY_LINK_CLASS, SMALL_BUTTON_CLASS } from './link-classes';
 import { useDossierAccess } from './use-dossier-access';
 import { useLoad } from './use-load';
@@ -996,7 +997,7 @@ function EditDossier({ dossierId }: { dossierId: string }) {
   const fetchDossier = useCallback(() => getDossier(dossierId), [dossierId]);
   const { loaded, reload } = useLoad(fetchDossier);
 
-  if (loaded.state === 'loading') return <LoadingText>Loading dossier…</LoadingText>;
+  if (loaded.state === 'loading') return <Loader label="Loading dossier…" />;
   if (loaded.state === 'error') {
     return (
       <section className="space-y-6">

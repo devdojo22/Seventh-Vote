@@ -10,6 +10,7 @@ import { Callout } from '@/components/ui/Callout';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CONTROL_CLASS, Field } from '@/components/ui/Field';
+import { Loader } from '@/components/ui/Loader';
 import { ArchiveIcon, ChevronDownIcon, PencilIcon } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/Modal';
 import { RadioPillGroup } from '@/components/ui/RadioPillGroup';
@@ -540,11 +541,7 @@ export function AdminWorkspacesPage() {
         </Callout>
       )}
 
-      {workspaces === null && !loadError && (
-        <p className="text-sm text-muted" aria-live="polite">
-          Loading workspaces…
-        </p>
-      )}
+      {workspaces === null && !loadError && <Loader label="Loading workspaces…" />}
 
       {actionError && <Callout title="That didn’t work">{actionError}</Callout>}
 

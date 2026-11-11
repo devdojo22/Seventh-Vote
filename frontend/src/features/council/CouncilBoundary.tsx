@@ -1,7 +1,8 @@
 import { Link, Outlet } from 'react-router';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { LoadError, LoadingText } from '@/features/dossiers/DossierStates';
+import { Loader } from '@/components/ui/Loader';
+import { LoadError } from '@/features/dossiers/DossierStates';
 import { PRIMARY_LINK_CLASS } from '@/features/dossiers/link-classes';
 import { useCurrentUser } from '@/stores/auth-session-store';
 import { useCouncilStore } from '@/stores/council-store';
@@ -42,7 +43,7 @@ export function CouncilBoundary() {
       />
     );
   }
-  if (status !== 'ready') return <LoadingText>Loading the council…</LoadingText>;
+  if (status !== 'ready') return <Loader label="Loading the council…" />;
 
   const refreshError = error && (
     <div className="mb-6">

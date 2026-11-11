@@ -12,6 +12,7 @@ import { Callout } from '@/components/ui/Callout';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CONTROL_CLASS } from '@/components/ui/Field';
 import { INPUT_ICON_CLASS } from '@/components/ui/IconInput';
+import { Loader } from '@/components/ui/Loader';
 import {
   ArrowUpRightIcon,
   ChevronDownIcon,
@@ -36,7 +37,7 @@ import { REVIEW_STATUSES, type ReviewStatus } from '@/types/dossier';
 import { dossierHref, listDossiers, type DossierSummary } from './dossier-api';
 import { ArchivedBadge, ReviewStatusBadge } from './DossierBadges';
 import { formatDateAndTime } from './dossier-format';
-import { DossierNotAvailable, LoadError, LoadingText } from './DossierStates';
+import { DossierNotAvailable, LoadError } from './DossierStates';
 import { PRIMARY_LINK_CLASS } from './link-classes';
 import { useDossierAccess } from './use-dossier-access';
 import { useLoad } from './use-load';
@@ -600,7 +601,7 @@ export function DossiersPage() {
           </Callout>
         )}
 
-        {loaded.state === 'loading' && <LoadingText>Loading dossiers…</LoadingText>}
+        {loaded.state === 'loading' && <Loader label="Loading dossiers…" />}
         {loaded.state === 'error' && (
           <LoadError
             title="Dossiers couldn’t be loaded"

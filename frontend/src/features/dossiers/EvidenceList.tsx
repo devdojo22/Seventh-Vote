@@ -2,13 +2,14 @@ import { useCallback } from 'react';
 import { SourceLink } from '@/components/SourceLink';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Loader } from '@/components/ui/Loader';
 import { AlertIcon, SourceDocIcon } from '@/components/ui/icons';
 import { EVIDENCE_KIND_LABELS, RECORD_OUTCOME_LABELS } from '@/data/dossier-options';
 import { isHttpUrl } from '@/lib/url';
 import { EVIDENCE_KINDS } from '@/types/dossier';
 import { getEvidence, type EvidenceItem } from './dossier-api';
 import { issueLabel, recordDate } from './dossier-format';
-import { LoadError, LoadingText } from './DossierStates';
+import { LoadError } from './DossierStates';
 import { useLoad } from './use-load';
 
 function hostOf(url: string): string {
@@ -63,7 +64,7 @@ export function EvidenceTab({ dossierId, versionNo }: { dossierId: string; versi
     [dossierId, versionNo],
   );
   const { loaded, reload } = useLoad(fetchEvidence);
-  if (loaded.state === 'loading') return <LoadingText>Loading evidence…</LoadingText>;
+  if (loaded.state === 'loading') return <Loader label="Loading evidence…" />;
   if (loaded.state === 'error') {
     return (
       <LoadError title="Evidence couldn’t be loaded" message={loaded.message} onRetry={reload} />

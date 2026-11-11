@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Callout } from '@/components/ui/Callout';
 import { Card } from '@/components/ui/Card';
+import { Loader } from '@/components/ui/Loader';
 import { ArchiveIcon, PencilIcon } from '@/components/ui/icons';
 import { useAppStore } from '@/stores/app-store';
 import type { ReviewStatus } from '@/types/dossier';
@@ -23,7 +24,7 @@ import { ArchiveDossierDialog, ReviewStatusDialog } from './DossierDialogs';
 import { currentVersionFromConflict, describeDossierError } from './dossier-errors';
 import { formatDateTime } from './dossier-format';
 import { ArchiveHistory, ReviewHistory, VersionHistory } from './DossierHistory';
-import { BackLink, DossierNotAvailable, LoadError, LoadingText } from './DossierStates';
+import { BackLink, DossierNotAvailable, LoadError } from './DossierStates';
 import { EvidenceTab } from './EvidenceList';
 import { PRIMARY_LINK_CLASS } from './link-classes';
 import { useAuthorName, useDossierAccess } from './use-dossier-access';
@@ -68,8 +69,12 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
   const canEdit = access.canEdit && !member.archived;
   const tabParam = params.get('tab');
   const tab: TabId = isTab(tabParam) ? tabParam : 'profile';
-  const selectTab = (id: TabId) =>
+  const [visited, setVisited] = useState<ReadonlySet<TabId>>(() => new Set([tab]));
+  const mounted = visited.has(tab) ? visited : new Set([...visited, tab]);
+  const selectTab = (id: TabId) => {
+    setVisited((current) => (current.has(id) ? current : new Set([...current, id])));
     setParams(id === 'profile' ? {} : { tab: id }, { replace: true });
+  };
 
   const run = async (
     action: () => Promise<unknown>,
@@ -214,13 +219,24 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
         })}
       </div>
 
-      <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {tab === 'profile' && <DossierContentView content={version} />}
-        {tab === 'evidence' && <EvidenceTab dossierId={dossier.id} />}
-        {tab === 'versions' && <VersionHistory key={revision} dossierId={dossierRef(dossier)} />}
-        {tab === 'review' && <ReviewHistory key={revision} dossierId={dossier.id} />}
-        {tab === 'archive' && <ArchiveHistory key={revision} dossierId={dossier.id} />}
-      </div>
+      {TABS.map(({ id }) =>
+        mounted.has(id) ? (
+          <div
+            key={id}
+            id={`panel-${id}`}
+            role="tabpanel"
+            aria-labelledby={`tab-${id}`}
+            hidden={id !== tab}
+            className="animate-fade-in"
+          >
+            {id === 'profile' && <DossierContentView content={version} />}
+            {id === 'evidence' && <EvidenceTab dossierId={dossier.id} />}
+            {id === 'versions' && <VersionHistory key={revision} dossierId={dossierRef(dossier)} />}
+            {id === 'review' && <ReviewHistory key={revision} dossierId={dossier.id} />}
+            {id === 'archive' && <ArchiveHistory key={revision} dossierId={dossier.id} />}
+          </div>
+        ) : null,
+      )}
 
       {canEdit && (
         <Card className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -288,7 +304,7 @@ export function DossierPage() {
   const { loaded, reload } = useLoad(fetchDossier);
 
   if (!access.canView) return <DossierNotAvailable reason="no-access" />;
-  if (loaded.state === 'loading') return <LoadingText>Loading dossier…</LoadingText>;
+  if (loaded.state === 'loading') return <Loader label="Loading dossier…" />;
   if (loaded.state === 'error') {
     return (
       <section className="space-y-6">
