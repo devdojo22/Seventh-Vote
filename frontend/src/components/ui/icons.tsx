@@ -72,6 +72,12 @@ export const PlusIcon = ({ className }: IconProps) => (
   </Icon>
 );
 
+export const MinusIcon = ({ className }: IconProps) => (
+  <Icon className={className}>
+    <path d="M5 12h14" />
+  </Icon>
+);
+
 export const ChevronDownIcon = ({ className }: IconProps) => (
   <Icon className={className}>
     <path d="m6 9 6 6 6-6" />

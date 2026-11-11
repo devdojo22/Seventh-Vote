@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/Badge';
 import { AlertIcon, CheckCircleIcon, ShieldIcon } from '@/components/ui/icons';
 import type { Role } from '@/types/access';
 import { ROLE_LABELS } from './access-labels';
+import { SEAT_STATE_LABELS, type SeatStateKind } from './affiliate-seats';
 
 const ROLE_CLASSES: Record<Role, string> = {
   PRINCIPAL: 'border border-gold/45 bg-amber-bg text-amber',
@@ -43,6 +44,23 @@ export function EmailStatusBadge({ verified }: { verified: boolean }) {
     <Badge className="border border-gold/35 bg-amber-bg text-amber">
       <AlertIcon className="size-3.5 text-gold" />
       Email not verified yet
+    </Badge>
+  );
+}
+
+const SEAT_STATE_CLASSES: Record<SeatStateKind, { badge: string; dot: string }> = {
+  available: { badge: 'border border-steel/25 bg-steel-bg text-navy', dot: 'bg-navy' },
+  full: { badge: 'border border-gold/45 bg-amber-bg text-amber', dot: 'bg-gold' },
+  over: { badge: 'border border-brick/30 bg-brick-bg text-brick', dot: 'bg-brick' },
+  unlimited: { badge: 'border border-line bg-white text-navy', dot: 'bg-muted' },
+};
+
+export function SeatStatusBadge({ kind }: { kind: SeatStateKind }) {
+  const classes = SEAT_STATE_CLASSES[kind];
+  return (
+    <Badge className={classes.badge}>
+      <span aria-hidden="true" className={`size-1.5 rounded-full ${classes.dot}`} />
+      {SEAT_STATE_LABELS[kind]}
     </Badge>
   );
 }

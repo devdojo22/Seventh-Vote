@@ -755,7 +755,7 @@ function DossierForm({ dossier }: { dossier: DossierDetail | null }) {
       </FormSection>
 
       <FormSection
-        title="Voice evidence"
+        title="Thinking Evidence"
         description="How the member speaks, and direct quotes from the public record."
         action={
           <AddButton

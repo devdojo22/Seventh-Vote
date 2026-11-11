@@ -8,6 +8,7 @@ export type MayorPosture = 'ally' | 'independent' | 'critic';
 export type RecordDepthLabel = 'Strong' | 'Moderate' | 'Thin';
 
 const THIN_RECORD_PENALTY = 3;
+const FULL_RECORD_SCORE = 20;
 const MAX_DOSSIER_SOURCES = 15;
 const NO_LEADERSHIP_ROLE = /^\s*none/i;
 const NOT_A_COUNCIL_OFFICE = /committee|emeritus|\b(former|past|ex|elect|outgoing|incoming|not)\b/i;
@@ -45,9 +46,10 @@ export function recordDepth(member: Member): { label: RecordDepthLabel; percent:
     Object.keys(member.issue_positions).length * 2 +
     member.notable_quotes.filter((q) => isHttpUrl(q.source_url)).length;
   if (rehearsalRules.thinRecordMemberIds.includes(member.id)) score -= THIN_RECORD_PENALTY;
-  if (score >= 16) return { label: 'Strong', percent: 90 };
-  if (score >= 11) return { label: 'Moderate', percent: 62 };
-  return { label: 'Thin', percent: 34 };
+  const percent = Math.round(Math.min(100, Math.max(0, (score / FULL_RECORD_SCORE) * 100)));
+  if (score >= 16) return { label: 'Strong', percent };
+  if (score >= 11) return { label: 'Moderate', percent };
+  return { label: 'Thin', percent };
 }
 
 /** Short role line for a member card: leadership role, else top committee chairmanship. */
@@ -66,7 +68,6 @@ export function fieldText(value: string | PoliticalStyle | TwinVoice): string {
   return 'description' in value ? value.description : value.style;
 }
 
-
 function councilOffice(role: string): 'chair' | 'viceChair' | null {
   if (NO_LEADERSHIP_ROLE.test(role)) return null;
   const title = role.split(/[(;—–]|\s-\s/)[0] ?? '';
@@ -74,7 +75,6 @@ function councilOffice(role: string): 'chair' | 'viceChair' | null {
   if (/\bvice[-\s]?chair(man|woman|person)?\b/i.test(title)) return 'viceChair';
   return /\bchair(man|woman|person)?\b/i.test(title) ? 'chair' : null;
 }
-
 
 export function councilOfficers(
   members: Member[],

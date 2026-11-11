@@ -6,6 +6,7 @@ const API_ERROR_CODES = [
   'too_many_attempts',
   'resend_cooldown',
   'account_exists',
+  'affiliate_seat_limit_reached',
   'validation_error',
   'version_conflict',
   'dossier_archived',
@@ -86,7 +87,6 @@ async function readJson(response: Response): Promise<unknown> {
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
-
 
 export async function apiRequest<T>(path: string, options: ApiRequestOptions<T>): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };

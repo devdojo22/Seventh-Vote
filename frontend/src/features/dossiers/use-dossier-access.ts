@@ -7,7 +7,6 @@ export interface DossierAccess {
   canEdit: boolean;
 }
 
-
 export function useDossierAccess(): DossierAccess {
   const user = useCurrentUser();
   const active = user.activeWorkspaceId !== null;
@@ -16,7 +15,6 @@ export function useDossierAccess(): DossierAccess {
     canEdit: active && user.permissions?.editDossiers === true,
   };
 }
-
 
 export function useAuthorName(): (userId: string) => string {
   const user = useCurrentUser();
@@ -28,13 +26,12 @@ export function useAuthorName(): (userId: string) => string {
     if (!canList) return;
     let active = true;
     listMembers(workspaceId).then(
-      (members) => {
+      ({ members }) => {
         if (active) {
           setNames(Object.fromEntries(members.map((m) => [m.userId, m.name ?? m.email])));
         }
       },
-      () => {
-      },
+      () => {},
     );
     return () => {
       active = false;

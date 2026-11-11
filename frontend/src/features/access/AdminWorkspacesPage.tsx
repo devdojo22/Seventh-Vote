@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useState, type DragEvent, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { z } from 'zod';
@@ -10,7 +10,7 @@ import { Callout } from '@/components/ui/Callout';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CONTROL_CLASS, Field } from '@/components/ui/Field';
-import { ArchiveIcon, ChevronDownIcon } from '@/components/ui/icons';
+import { ArchiveIcon, ChevronDownIcon, PencilIcon } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/Modal';
 import { RadioPillGroup } from '@/components/ui/RadioPillGroup';
 import { SectionHeading } from '@/components/ui/SectionHeading';
@@ -28,6 +28,8 @@ import {
   type AdminWorkspace,
 } from './access-api';
 import { describeAccessError } from './access-errors';
+import { AffiliateSeatUsage } from './AffiliateSeatUsage';
+import { SeatLimitDialog } from './SeatLimitDialog';
 import {
   formatDate,
   PREVIOUS_PRINCIPAL_OUTCOME_DESCRIPTIONS,
@@ -350,7 +352,32 @@ function DeleteWorkspaceDialog({
   );
 }
 
-type PendingAction = { kind: 'designate' | 'archive' | 'delete'; workspace: AdminWorkspace };
+type PendingAction = {
+  kind: 'designate' | 'archive' | 'delete' | 'seats';
+  workspace: AdminWorkspace;
+};
+
+function WorkspaceCard({
+  workspace,
+  actions,
+  seatAction,
+}: {
+  workspace: AdminWorkspace;
+  actions: ReactNode;
+  seatAction?: ReactNode;
+}) {
+  return (
+    <Card padded={false} className="overflow-hidden">
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:px-6">
+        <WorkspaceSummary workspace={workspace} />
+        <div className="flex flex-col gap-2 sm:flex-row">{actions}</div>
+      </div>
+      <div className="border-t border-line bg-paper/60 px-5 py-4 sm:px-6">
+        <AffiliateSeatUsage seats={workspace.affiliateSeats} action={seatAction} />
+      </div>
+    </Card>
+  );
+}
 
 function countNote(count: number): string {
   return `${count} workspace${count === 1 ? '' : 's'}`;
@@ -486,7 +513,7 @@ export function AdminWorkspacesPage() {
     <PageHeader
       eyebrow="Platform administration"
       title="Workspaces"
-      description="Create workspaces, designate each one’s Principal, and archive, restore or delete them. Your access to workspaces is recorded in the audit log."
+      description="Create workspaces, designate each one’s Principal, set Affiliate seat limits, and archive, restore or delete them. Your access to workspaces is recorded in the audit log."
     />
   );
 
@@ -533,31 +560,43 @@ export function AdminWorkspacesPage() {
             <ul className="grid grid-cols-1 gap-3">
               {activeWorkspaces.map((workspace) => (
                 <li key={workspace.id} {...draggable(workspace)}>
-                  <Card className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                    <WorkspaceSummary workspace={workspace} />
-                    <div className="flex flex-col gap-2 sm:flex-row">
+                  <WorkspaceCard
+                    workspace={workspace}
+                    actions={
+                      <>
+                        <button
+                          type="button"
+                          className={LINK_BUTTON_CLASS}
+                          onClick={() => setPending({ kind: 'designate', workspace })}
+                        >
+                          {workspace.principal ? 'Transfer Principal' : 'Designate Principal'}
+                        </button>
+                        <Link
+                          to={`/workspaces/${workspace.id}/members`}
+                          className={LINK_BUTTON_CLASS}
+                        >
+                          Members
+                        </Link>
+                        <button
+                          type="button"
+                          className={LINK_BUTTON_CLASS}
+                          onClick={() => setPending({ kind: 'archive', workspace })}
+                        >
+                          Archive
+                        </button>
+                      </>
+                    }
+                    seatAction={
                       <button
                         type="button"
-                        className={LINK_BUTTON_CLASS}
-                        onClick={() => setPending({ kind: 'designate', workspace })}
+                        className={`${LINK_BUTTON_CLASS} gap-1.5`}
+                        onClick={() => setPending({ kind: 'seats', workspace })}
                       >
-                        {workspace.principal ? 'Transfer Principal' : 'Designate Principal'}
+                        <PencilIcon className="size-3.5" />
+                        Edit Seat Limit
                       </button>
-                      <Link
-                        to={`/workspaces/${workspace.id}/members`}
-                        className={LINK_BUTTON_CLASS}
-                      >
-                        Members
-                      </Link>
-                      <button
-                        type="button"
-                        className={LINK_BUTTON_CLASS}
-                        onClick={() => setPending({ kind: 'archive', workspace })}
-                      >
-                        Archive
-                      </button>
-                    </div>
-                  </Card>
+                    }
+                  />
                 </li>
               ))}
             </ul>
@@ -607,27 +646,29 @@ export function AdminWorkspacesPage() {
                   <ul className="grid grid-cols-1 gap-3">
                     {archivedWorkspaces.map((workspace) => (
                       <li key={workspace.id} {...draggable(workspace)}>
-                        <Card className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                          <WorkspaceSummary workspace={workspace} />
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <button
-                              type="button"
-                              className={LINK_BUTTON_CLASS}
-                              disabled={restoringId === workspace.id}
-                              aria-busy={restoringId === workspace.id}
-                              onClick={() => void restore(workspace)}
-                            >
-                              {restoringId === workspace.id ? 'Restoring…' : 'Restore'}
-                            </button>
-                            <button
-                              type="button"
-                              className={DANGER_LINK_BUTTON_CLASS}
-                              onClick={() => setPending({ kind: 'delete', workspace })}
-                            >
-                              Delete permanently
-                            </button>
-                          </div>
-                        </Card>
+                        <WorkspaceCard
+                          workspace={workspace}
+                          actions={
+                            <>
+                              <button
+                                type="button"
+                                className={LINK_BUTTON_CLASS}
+                                disabled={restoringId === workspace.id}
+                                aria-busy={restoringId === workspace.id}
+                                onClick={() => void restore(workspace)}
+                              >
+                                {restoringId === workspace.id ? 'Restoring…' : 'Restore'}
+                              </button>
+                              <button
+                                type="button"
+                                className={DANGER_LINK_BUTTON_CLASS}
+                                onClick={() => setPending({ kind: 'delete', workspace })}
+                              >
+                                Delete permanently
+                              </button>
+                            </>
+                          }
+                        />
                       </li>
                     ))}
                   </ul>
@@ -647,6 +688,13 @@ export function AdminWorkspacesPage() {
       )}
       {pending?.kind === 'archive' && (
         <ArchiveWorkspaceDialog
+          workspace={pending.workspace}
+          onClose={closeDialog}
+          onDone={finishAction}
+        />
+      )}
+      {pending?.kind === 'seats' && (
+        <SeatLimitDialog
           workspace={pending.workspace}
           onClose={closeDialog}
           onDone={finishAction}

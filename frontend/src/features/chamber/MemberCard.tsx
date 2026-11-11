@@ -58,9 +58,15 @@ export function MemberCard({ member, onOpen }: MemberCardProps) {
         {yourCall && <Badge className={YOUR_CALL_BADGE_CLASS}>Your call: {yourCall}</Badge>}
       </span>
 
-      <span className="mt-4 flex items-center gap-3 border-t border-line2 pt-3.5 text-[11px] font-medium text-muted">
-        <span className="shrink-0">{depth.label} record</span>
-        <Meter percent={depth.percent} className="flex-1" />
+      <span className="mt-4 grid gap-2 border-t border-line2 pt-3.5 text-[11px] font-medium text-muted">
+        <span className="flex items-center justify-between gap-3">
+          <span>{depth.label} record</span>
+          <span className="font-semibold text-navy tabular-nums">{depth.percent}/100</span>
+        </span>
+        <Meter
+          percent={depth.percent}
+          label={`${depth.label} record, ${depth.percent} out of 100`}
+        />
       </span>
     </button>
   );

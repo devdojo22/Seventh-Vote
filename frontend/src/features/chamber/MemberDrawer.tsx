@@ -183,7 +183,7 @@ export function MemberDrawer() {
               </ol>
             </Section>
 
-            <Section title="Voice evidence">
+            <Section title="Thinking Evidence">
               <p>{fieldText(member.twin_voice)}</p>
               {quotes.length > 0 ? (
                 <div className="space-y-3">

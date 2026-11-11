@@ -144,7 +144,7 @@ export function DossierContentView({ content }: { content: DossierContent }) {
         )}
       </Section>
 
-      <Section title="Voice evidence">
+      <Section title="Thinking Evidence">
         <p>{voice.description || 'No speaking style recorded.'}</p>
         {voice.example.quote && (
           <figure className="rounded-xl border border-line p-4">

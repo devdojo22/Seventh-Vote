@@ -24,6 +24,22 @@ const invitationSchema = z.object({
 });
 export type Invitation = z.infer<typeof invitationSchema>;
 
+const affiliateSeatsSchema = z.object({
+  seatLimit: z.number().int().nonnegative().nullable(),
+  seatsUsed: z.number().int().nonnegative(),
+  seatsAvailable: z.number().int().nonnegative().nullable(),
+  isOverLimit: z.boolean(),
+  activeAffiliates: z.number().int().nonnegative(),
+  pendingInvitations: z.number().int().nonnegative(),
+});
+export type AffiliateSeats = z.infer<typeof affiliateSeatsSchema>;
+
+const membersSchema = z.object({
+  members: z.array(memberSchema),
+  affiliateSeats: affiliateSeatsSchema,
+});
+export type WorkspaceMembers = z.infer<typeof membersSchema>;
+
 const adminWorkspaceSchema = z.object({
   id: z.guid(),
   name: z.string(),
@@ -34,6 +50,7 @@ const adminWorkspaceSchema = z.object({
     .object({ userId: z.guid(), email: z.string().min(1), name: z.string().nullable() })
     .nullable(),
   memberCount: z.number().int().nonnegative(),
+  affiliateSeats: affiliateSeatsSchema,
 });
 export type AdminWorkspace = z.infer<typeof adminWorkspaceSchema>;
 
@@ -89,12 +106,12 @@ export async function updateVoteRules(
   return settings;
 }
 
-export function listMembers(workspaceId: string): Promise<Member[]> {
+export function listMembers(workspaceId: string): Promise<WorkspaceMembers> {
   return withAccessToken((bearer) =>
     apiRequest(`${workspacePath(workspaceId)}/members`, {
       method: 'GET',
       bearer,
-      schema: z.array(memberSchema),
+      schema: membersSchema,
     }),
   );
 }
@@ -198,6 +215,20 @@ export function designatePrincipal(
   );
 }
 
+export function updateSeatLimit(
+  workspaceId: string,
+  seatLimit: number | null,
+): Promise<AffiliateSeats> {
+  return withAccessToken((bearer) =>
+    apiRequest(`${adminWorkspacePath(workspaceId)}/seat-limit`, {
+      method: 'PUT',
+      bearer,
+      body: { seatLimit },
+      schema: affiliateSeatsSchema,
+    }),
+  );
+}
+
 export function archiveWorkspace(workspaceId: string): Promise<void> {
   return withAccessToken((bearer) =>
     apiRequest(`${adminWorkspacePath(workspaceId)}/archive`, {
@@ -218,7 +249,6 @@ export function restoreWorkspace(workspaceId: string): Promise<void> {
   );
 }
 
-/** Irreversible. The server deletes only an archived workspace whose slug matches `confirmSlug`. */
 export function deleteWorkspace(workspaceId: string, confirmSlug: string): Promise<void> {
   return withAccessToken((bearer) =>
     apiRequest(adminWorkspacePath(workspaceId), {

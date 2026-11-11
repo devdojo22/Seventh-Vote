@@ -14,6 +14,7 @@ import { Field } from '@/components/ui/Field';
 import { IconInput } from '@/components/ui/IconInput';
 import { MailIcon } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/Modal';
+import { ApiError } from '@/lib/api/http';
 import { useAppStore } from '@/stores/app-store';
 import { emailAddress } from '@/features/auth/auth-schema';
 import { useCurrentUser } from '@/stores/auth-session-store';
@@ -24,12 +25,14 @@ import {
   removeMember,
   revokeInvitation,
   setMemberDossierEdit,
+  type AffiliateSeats,
   type Invitation,
   type Member,
 } from './access-api';
 import { describeAccessError } from './access-errors';
 import { formatDate, ROLE_LABELS } from './access-labels';
-import { RoleBadge } from './AccessBadges';
+import { RoleBadge, SeatStatusBadge } from './AccessBadges';
+import { describeSeats, overLimitExplanation } from './affiliate-seats';
 
 const SMALL_BUTTON_CLASS =
   'cursor-pointer rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-navy shadow-card transition-colors hover:border-navy/25 hover:bg-paper focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50';
@@ -43,11 +46,40 @@ type InviteValues = z.infer<typeof inviteSchema>;
 type Loaded =
   | { state: 'loading' }
   | { state: 'error'; message: string }
-  | { state: 'ready'; members: Member[]; invitations: Invitation[] };
+  | {
+      state: 'ready';
+      members: Member[];
+      invitations: Invitation[];
+      affiliateSeats: AffiliateSeats;
+    };
 
-function InviteForm({ workspaceId, onInvited }: { workspaceId: string; onInvited: () => void }) {
+function seatUsageLine({ seatLimit, seatsUsed }: AffiliateSeats): string | null {
+  return seatLimit === null
+    ? null
+    : `${String(seatsUsed)} of ${String(seatLimit)} Affiliate seat${seatLimit === 1 ? '' : 's'} used`;
+}
+
+function inviteBlockedReason({ seatLimit, seatsUsed }: AffiliateSeats): string | null {
+  if (seatLimit === null || seatsUsed < seatLimit) return null;
+  return seatLimit === 0
+    ? 'This workspace has no Affiliate seats. Ask a platform administrator to set a seat limit.'
+    : 'Every Affiliate seat is in use. Withdraw a pending invitation or remove an Affiliate to free a seat, or ask a platform administrator to raise the limit.';
+}
+
+function InviteForm({
+  workspaceId,
+  seats,
+  onInvited,
+}: {
+  workspaceId: string;
+  seats: AffiliateSeats | null;
+  onInvited: () => void;
+}) {
   const showToast = useAppStore((s) => s.showToast);
   const [error, setError] = useState<string | null>(null);
+  const usage = seats && seatUsageLine(seats);
+  const blockedReason = seats && inviteBlockedReason(seats);
+  const blocked = blockedReason !== null;
   const {
     register,
     handleSubmit,
@@ -67,6 +99,7 @@ function InviteForm({ workspaceId, onInvited }: { workspaceId: string; onInvited
       onInvited();
     } catch (caught) {
       setError(describeAccessError(caught));
+      if (caught instanceof ApiError && caught.code === 'affiliate_seat_limit_reached') onInvited();
     }
   };
 
@@ -74,7 +107,13 @@ function InviteForm({ workspaceId, onInvited }: { workspaceId: string; onInvited
     <Card>
       <form noValidate className="grid gap-4" onSubmit={(e) => void handleSubmit(onValid)(e)}>
         <div>
-          <h2 className="font-display text-lg font-bold text-navy">Invite an Affiliate</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-bold text-navy">Invite an Affiliate</h2>
+            {seats && usage && (
+              <SeatStatusBadge kind={describeSeats(seats.seatLimit, seats.seatsUsed).kind} />
+            )}
+          </div>
+          {usage && <p className="mt-1 text-sm font-semibold text-navy">{usage}</p>}
           <p className="mt-1 text-xs leading-relaxed text-muted">
             Affiliates can view dossiers, run rehearsals and view results. They can’t manage users
             or change workspace settings. The invitation link works once and expires.
@@ -89,13 +128,31 @@ function InviteForm({ workspaceId, onInvited }: { workspaceId: string; onInvited
             autoComplete="off"
             placeholder="name@example.gov"
             aria-invalid={Boolean(errors.email)}
-            aria-describedby={errors.email ? 'invite-email-error' : undefined}
-            {...register('email')}
+            aria-describedby={
+              errors.email ? 'invite-email-error' : blocked ? 'invite-blocked-reason' : undefined
+            }
+            {...register('email', { disabled: blocked })}
           />
         </Field>
-        <Checkbox label="Allow this Affiliate to edit dossiers" {...register('canEditDossiers')} />
+        <Checkbox
+          label="Allow this Affiliate to edit dossiers"
+          {...register('canEditDossiers', { disabled: blocked })}
+        />
+        {blockedReason && (
+          <p
+            id="invite-blocked-reason"
+            className="text-xs leading-relaxed font-semibold text-amber"
+          >
+            {blockedReason}
+          </p>
+        )}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+          <Button
+            type="submit"
+            disabled={isSubmitting || blocked}
+            aria-busy={isSubmitting}
+            aria-describedby={blocked ? 'invite-blocked-reason' : undefined}
+          >
             {isSubmitting ? 'Sending…' : 'Send invitation'}
           </Button>
           {error && (
@@ -165,8 +222,8 @@ export function MembersPage() {
     if (!canManage) return;
     let active = true;
     Promise.all([listMembers(workspaceId), listInvitations(workspaceId)])
-      .then(([members, invitations]) => {
-        if (active) setLoaded({ state: 'ready', members, invitations });
+      .then(([{ members, affiliateSeats }, invitations]) => {
+        if (active) setLoaded({ state: 'ready', members, invitations, affiliateSeats });
       })
       .catch((error: unknown) => {
         if (active) setLoaded({ state: 'error', message: describeAccessError(error) });
@@ -216,7 +273,21 @@ export function MembersPage() {
     <section className="space-y-8">
       {header}
 
-      <InviteForm workspaceId={workspaceId} onInvited={load} />
+      {loaded.state === 'ready' &&
+        loaded.affiliateSeats.isOverLimit &&
+        loaded.affiliateSeats.seatLimit !== null && (
+          <Callout title="Over the Affiliate seat limit">
+            This workspace uses {loaded.affiliateSeats.seatsUsed} Affiliate seats but its limit is{' '}
+            {loaded.affiliateSeats.seatLimit}.{' '}
+            {overLimitExplanation(loaded.affiliateSeats.seatsUsed, loaded.affiliateSeats.seatLimit)}
+          </Callout>
+        )}
+
+      <InviteForm
+        workspaceId={workspaceId}
+        seats={loaded.state === 'ready' ? loaded.affiliateSeats : null}
+        onInvited={load}
+      />
 
       {actionError && (
         <Callout title="That didn’t work">

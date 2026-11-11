@@ -78,6 +78,9 @@ export function describeInvitationError(error: unknown): InvitationErrorView {
           body: 'Sign in with the invited email address to accept the invitation.',
         });
       }
+      if (error.code === 'affiliate_seat_limit_reached') {
+        return view('retryable', { title: 'No Affiliate seat available', body: error.message });
+      }
       return view('retryable', SERVER_NOTICE);
     case 429:
       return view('retryable', RATE_LIMIT_NOTICE);
