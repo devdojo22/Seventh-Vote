@@ -1,6 +1,7 @@
 import { PreviousPrincipalOutcome } from '@prisma/client';
 import { z } from 'zod';
 import { emailSchema } from '../../shared/validation/email.js';
+import { AFFILIATE_SEAT_LIMIT_MAX } from './affiliate-seats.js';
 
 export const createWorkspaceSchema = z.object({
   name: z
@@ -51,9 +52,22 @@ export const voteRulesSchema = z
 
 export const updateSettingsSchema = z.object({ voteRules: voteRulesSchema }).strict();
 
+/** null: unlimited. */
+export const updateSeatLimitSchema = z
+  .object({
+    seatLimit: z
+      .number()
+      .int('Use a whole number')
+      .min(0, 'Use 0 or more')
+      .max(AFFILIATE_SEAT_LIMIT_MAX, `Use at most ${String(AFFILIATE_SEAT_LIMIT_MAX)}`)
+      .nullable(),
+  })
+  .strict();
+
 export const idParamSchema = z.string().uuid();
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type DesignatePrincipalInput = z.infer<typeof designatePrincipalSchema>;
 export type InviteAffiliateInput = z.infer<typeof inviteAffiliateSchema>;
 export type VoteRulesInput = z.infer<typeof voteRulesSchema>;
+export type UpdateSeatLimitInput = z.infer<typeof updateSeatLimitSchema>;

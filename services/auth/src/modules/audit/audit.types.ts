@@ -19,6 +19,7 @@ export type AuditAction =
   | 'admin.workspace_access'
   | 'workspace.created'
   | 'workspace.settings_updated'
+  | 'workspace.seat_limit_updated'
   | 'workspace.principal_transferred'
   | 'workspace.archived'
   | 'workspace.restored'

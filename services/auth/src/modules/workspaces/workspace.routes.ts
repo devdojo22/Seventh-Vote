@@ -24,6 +24,7 @@ export function createWorkspaceRouter(
     limiters.invitationSendByAccount,
     controller.designatePrincipal,
   );
+  router.put('/admin/workspaces/:workspaceId/seat-limit', ...superAdmin, controller.updateSeatLimit);
   router.post('/admin/workspaces/:workspaceId/archive', ...superAdmin, controller.archive);
   router.post('/admin/workspaces/:workspaceId/restore', ...superAdmin, controller.restore);
   router.delete('/admin/workspaces/:workspaceId', ...superAdmin, controller.deletePermanently);

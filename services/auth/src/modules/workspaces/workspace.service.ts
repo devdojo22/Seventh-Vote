@@ -3,9 +3,11 @@ import { HttpError } from '../../shared/errors/http-error.js';
 import { isUniqueConstraintViolation } from '../../shared/errors/prisma-errors.js';
 import type {
   AdminWorkspaceResponse,
+  AffiliateSeatsResponse,
   DesignatePrincipalResponse,
   InvitationResponse,
   MemberResponse,
+  MembersResponse,
   WorkspaceResponse,
   WorkspaceSettingsResponse,
 } from '../../shared/types/api.types.js';
@@ -13,12 +15,14 @@ import type { AuditService, RequestContext } from '../audit/audit.service.js';
 import type { InvitationService } from '../invitations/invitation.service.js';
 import type { UserRepository } from '../users/user.repository.js';
 import { displayName } from '../users/user.service.js';
+import { toAffiliateSeats } from './affiliate-seats.js';
 import type { MembershipRepository, MembershipWithUser, TransferResult } from './membership.repository.js';
 import { WORKSPACE_ARCHIVED } from './workspace-access.service.js';
 import type {
   CreateWorkspaceInput,
   DesignatePrincipalInput,
   InviteAffiliateInput,
+  UpdateSeatLimitInput,
   VoteRulesInput,
 } from './workspace.validation.js';
 import type { LifecycleResult, WorkspaceRepository } from './workspace.repository.js';
@@ -71,7 +75,6 @@ function toWorkspaceResponse(workspace: Workspace): WorkspaceResponse {
 export class WorkspaceService {
   constructor(private readonly deps: WorkspaceServiceDependencies) {}
 
-  /** Super-admin: creates a workspace with no members. Its Principal is designated separately. */
   async create(actorId: string, input: CreateWorkspaceInput, context: RequestContext): Promise<WorkspaceResponse> {
     const workspace = await this.deps.workspaces.create(input);
     if (!workspace) throw new HttpError(409, 'A workspace with this slug already exists');
@@ -85,7 +88,7 @@ export class WorkspaceService {
   }
 
   async listOverview(): Promise<AdminWorkspaceResponse[]> {
-    return (await this.deps.workspaces.listOverview()).map((workspace) => ({
+    return (await this.deps.workspaces.listOverview(this.deps.now())).map(({ affiliateSeats, ...workspace }) => ({
       ...toWorkspaceResponse(workspace),
       principal:
         workspace.principal === null
@@ -96,9 +99,26 @@ export class WorkspaceService {
               name: displayName(workspace.principal),
             },
       memberCount: workspace.memberCount,
+      affiliateSeats: toAffiliateSeats(affiliateSeats),
     }));
   }
 
+  /** Super-admin: sets the Affiliate seat limit (null: unlimited). Lowering it below usage removes nothing. */
+  async updateSeatLimit(
+    actorId: string,
+    workspaceId: string,
+    { seatLimit }: UpdateSeatLimitInput,
+    context: RequestContext,
+  ): Promise<AffiliateSeatsResponse> {
+    const result = await this.deps.workspaces.updateSeatLimit(
+      workspaceId,
+      seatLimit,
+      { userId: actorId, ip: context.ip },
+      this.deps.now(),
+    );
+    if (result.status === 'not-found') throw new HttpError(404, 'Workspace not found');
+    return toAffiliateSeats(result.usage);
+  }
 
 
   async designatePrincipal(
@@ -195,8 +215,11 @@ export class WorkspaceService {
     }
   }
 
-  async listMembers(workspaceId: string): Promise<MemberResponse[]> {
-    return (await this.deps.memberships.listForWorkspace(workspaceId)).map(toMemberResponse);
+  async listMembers(workspaceId: string): Promise<MembersResponse> {
+    const members = await this.deps.memberships.listForWorkspace(workspaceId);
+    const usage = await this.deps.workspaces.readAffiliateSeats(workspaceId, this.deps.now());
+    if (!usage) throw new HttpError(404, 'Workspace not found');
+    return { members: members.map(toMemberResponse), affiliateSeats: toAffiliateSeats(usage) };
   }
 
   async inviteAffiliate(

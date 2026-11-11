@@ -6,6 +6,11 @@ import {
   type PrismaClient,
   type Workspace,
 } from '@prisma/client';
+import {
+  AffiliateSeatLimitReached,
+  assertSeatCanBeOccupied,
+  assertSeatCanBeReserved,
+} from '../workspaces/affiliate-seats.js';
 import { grantMembership, type PrincipalChange } from '../workspaces/membership.repository.js';
 import { lockWorkspace } from '../workspaces/workspace.repository.js';
 
@@ -16,7 +21,6 @@ export interface NewInvitation {
   email: string;
   role: Role;
   canEditDossiers: boolean;
-  /** PRINCIPAL invitations only; null otherwise. */
   previousPrincipalOutcome: PreviousPrincipalOutcome | null;
   tokenHash: string;
   invitedById: string | null;
@@ -35,11 +39,16 @@ export type AcceptResult =
   | { status: 'accepted'; userId: string; workspaceId: string; role: Role; change: PrincipalChange }
   | { status: 'invalid' }
   | { status: 'account-exists' }
-  /** The accepting account is a super-admin, which never holds a workspace role. Nothing was consumed. */
-  | { status: 'ineligible' };
+  | { status: 'ineligible' }
+  | { status: 'seat-limit' };
+
+export type CreateInvitationResult =
+  | { status: 'created'; invitation: Invitation }
+  | { status: 'workspace-unavailable' }
+  | { status: 'seat-limit' };
 
 export interface InvitationRepository {
-  create(invitation: NewInvitation): Promise<Invitation>;
+  create(invitation: NewInvitation): Promise<CreateInvitationResult>;
   markSent(invitation: Pick<Invitation, 'id' | 'workspaceId' | 'email' | 'role'>, now: Date): Promise<boolean>;
   findByHash(tokenHash: string): Promise<InvitationWithWorkspace | null>;
   listPending(workspaceId: string, now: Date, roles: readonly Role[]): Promise<Invitation[]>;
@@ -48,7 +57,6 @@ export interface InvitationRepository {
   acceptForUser(id: string, userId: string, now: Date): Promise<AcceptResult>;
 }
 
-/** Takes the lock of the invitation's workspace; false when the invitation does not exist. */
 async function lockInvitationWorkspace(tx: Prisma.TransactionClient, id: string): Promise<boolean> {
   const invitation = await tx.invitation.findUnique({ where: { id }, select: { workspaceId: true } });
   if (!invitation) return false;
@@ -56,7 +64,6 @@ async function lockInvitationWorkspace(tx: Prisma.TransactionClient, id: string)
   return true;
 }
 
-/** Marks a usable invitation accepted. An archived workspace's invitations cannot be accepted. */
 async function claim(tx: Prisma.TransactionClient, id: string, now: Date): Promise<Invitation | null> {
   const { count } = await tx.invitation.updateMany({
     where: {
@@ -89,11 +96,40 @@ async function grant(
   return { status: 'accepted', userId, workspaceId: invitation.workspaceId, role: invitation.role, change };
 }
 
+/** An acceptance that ran out of seats was rolled back whole (the invitation is not consumed); report it. */
+async function withinSeatLimit(acceptance: Promise<AcceptResult>): Promise<AcceptResult> {
+  try {
+    return await acceptance;
+  } catch (error) {
+    if (error instanceof AffiliateSeatLimitReached) return { status: 'seat-limit' };
+    throw error;
+  }
+}
+
 export class PrismaInvitationRepository implements InvitationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  create(invitation: NewInvitation): Promise<Invitation> {
-    return this.prisma.invitation.create({ data: { ...invitation, sentAt: null } });
+  async create(invitation: NewInvitation): Promise<CreateInvitationResult> {
+    const { workspaceId, role, email, previousPrincipalOutcome } = invitation;
+    try {
+      return await this.prisma.$transaction(async (tx): Promise<CreateInvitationResult> => {
+        await lockWorkspace(tx, workspaceId);
+        const workspace = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { archivedAt: true } });
+        if (workspace?.archivedAt !== null) return { status: 'workspace-unavailable' };
+        if (role === Role.AFFILIATE) {
+          await assertSeatCanBeReserved(tx, workspaceId, invitation.createdAt, { replacingEmail: email });
+        } else if (
+          previousPrincipalOutcome === PreviousPrincipalOutcome.KEEP_AS_AFFILIATE &&
+          (await tx.membership.count({ where: { workspaceId, role: Role.PRINCIPAL } })) > 0
+        ) {
+          await assertSeatCanBeOccupied(tx, workspaceId, 1);
+        }
+        return { status: 'created', invitation: await tx.invitation.create({ data: { ...invitation, sentAt: null } }) };
+      });
+    } catch (error) {
+      if (error instanceof AffiliateSeatLimitReached) return { status: 'seat-limit' };
+      throw error;
+    }
   }
 
   markSent({ id, workspaceId, email, role }: Pick<Invitation, 'id' | 'workspaceId' | 'email' | 'role'>, now: Date): Promise<boolean> {
@@ -146,24 +182,28 @@ export class PrismaInvitationRepository implements InvitationRepository {
   }
 
   acceptWithNewAccount(id: string, account: NewAccount, now: Date): Promise<AcceptResult> {
-    return this.prisma.$transaction(async (tx): Promise<AcceptResult> => {
-      if (!(await lockInvitationWorkspace(tx, id))) return { status: 'invalid' };
-      if (await tx.user.findUnique({ where: { email: account.email } })) return { status: 'account-exists' };
-      const invitation = await claim(tx, id, now);
-      if (!invitation) return { status: 'invalid' };
-      const user = await tx.user.create({ data: { ...account, emailVerifiedAt: now } });
-      return grant(tx, invitation, user.id, now);
-    });
+    return withinSeatLimit(
+      this.prisma.$transaction(async (tx): Promise<AcceptResult> => {
+        if (!(await lockInvitationWorkspace(tx, id))) return { status: 'invalid' };
+        if (await tx.user.findUnique({ where: { email: account.email } })) return { status: 'account-exists' };
+        const invitation = await claim(tx, id, now);
+        if (!invitation) return { status: 'invalid' };
+        const user = await tx.user.create({ data: { ...account, emailVerifiedAt: now } });
+        return grant(tx, invitation, user.id, now);
+      }),
+    );
   }
 
   acceptForUser(id: string, userId: string, now: Date): Promise<AcceptResult> {
-    return this.prisma.$transaction(async (tx): Promise<AcceptResult> => {
-      if (!(await lockInvitationWorkspace(tx, id))) return { status: 'invalid' };
-      const user = await tx.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });
-      if (user?.isSuperAdmin) return { status: 'ineligible' };
-      const invitation = await claim(tx, id, now);
-      if (!invitation) return { status: 'invalid' };
-      return grant(tx, invitation, userId, now);
-    });
+    return withinSeatLimit(
+      this.prisma.$transaction(async (tx): Promise<AcceptResult> => {
+        if (!(await lockInvitationWorkspace(tx, id))) return { status: 'invalid' };
+        const user = await tx.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });
+        if (user?.isSuperAdmin) return { status: 'ineligible' };
+        const invitation = await claim(tx, id, now);
+        if (!invitation) return { status: 'invalid' };
+        return grant(tx, invitation, userId, now);
+      }),
+    );
   }
 }

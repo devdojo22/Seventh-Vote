@@ -1,6 +1,12 @@
 import { Role, type Prisma, type PrismaClient, type User, type Workspace } from '@prisma/client';
 import { isUniqueConstraintViolation } from '../../shared/errors/prisma-errors.js';
 import { insertAuditEntry } from '../audit/audit.repository.js';
+import {
+  AFFILIATE_MEMBERSHIP,
+  pendingAffiliateInvitation,
+  readAffiliateSeatUsage,
+  type AffiliateSeatUsage,
+} from './affiliate-seats.js';
 
 const DELETE_TRANSACTION_TIMEOUT_MS = 60_000;
 
@@ -12,7 +18,15 @@ export interface NewWorkspace {
 export type WorkspaceOverview = Workspace & {
   principal: User | null;
   memberCount: number;
+  affiliateSeats: AffiliateSeatUsage;
 };
+
+export interface SeatLimitActor {
+  userId: string;
+  ip: string | null;
+}
+
+export type SeatLimitResult = { status: 'updated'; usage: AffiliateSeatUsage } | { status: 'not-found' };
 
 export interface VoteRulesUpdate {
   voteBodySize: number;
@@ -66,7 +80,11 @@ export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
   updateVoteRules(id: string, rules: VoteRulesUpdate): Promise<Workspace | null>;
   create(workspace: NewWorkspace): Promise<Workspace | null>;
-  listOverview(): Promise<WorkspaceOverview[]>;
+  listOverview(now: Date): Promise<WorkspaceOverview[]>;
+  /** Current Affiliate seat usage; null when the workspace does not exist. */
+  readAffiliateSeats(id: string, now: Date): Promise<AffiliateSeatUsage | null>;
+  /** Sets the limit (null: unlimited) and records workspace.seat_limit_updated when it changed, atomically. */
+  updateSeatLimit(id: string, seatLimit: number | null, actor: SeatLimitActor, now: Date): Promise<SeatLimitResult>;
   archive(id: string, now: Date): Promise<LifecycleResult>;
   restore(id: string): Promise<LifecycleResult>;
   deletePermanently(id: string, confirmSlug: string, actor: DeletionActor, now: Date): Promise<DeletionResult>;
@@ -93,7 +111,7 @@ export class PrismaWorkspaceRepository implements WorkspaceRepository {
     }
   }
 
-  async listOverview(): Promise<WorkspaceOverview[]> {
+  async listOverview(now: Date): Promise<WorkspaceOverview[]> {
     const workspaces = await this.prisma.workspace.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
@@ -101,11 +119,58 @@ export class PrismaWorkspaceRepository implements WorkspaceRepository {
         _count: { select: { memberships: true } },
       },
     });
+    // Seat counts come from two grouped queries rather than one count per workspace.
+    const ids = workspaces.map(({ id }) => id);
+    const affiliates = await this.prisma.membership.groupBy({
+      by: ['workspaceId'],
+      where: { workspaceId: { in: ids }, ...AFFILIATE_MEMBERSHIP },
+      _count: { _all: true },
+    });
+    const pending = await this.prisma.invitation.groupBy({
+      by: ['workspaceId'],
+      where: { workspaceId: { in: ids }, ...pendingAffiliateInvitation(now) },
+      _count: { _all: true },
+    });
+    const affiliateCounts = new Map(affiliates.map((row) => [row.workspaceId, row._count._all]));
+    const pendingCounts = new Map(pending.map((row) => [row.workspaceId, row._count._all]));
     return workspaces.map(({ memberships, _count, ...workspace }) => ({
       ...workspace,
       principal: memberships[0]?.user ?? null,
       memberCount: _count.memberships,
+      affiliateSeats: {
+        seatLimit: workspace.seatLimit,
+        activeAffiliates: affiliateCounts.get(workspace.id) ?? 0,
+        pendingInvitations: pendingCounts.get(workspace.id) ?? 0,
+      },
     }));
+  }
+
+  readAffiliateSeats(id: string, now: Date): Promise<AffiliateSeatUsage | null> {
+    return readAffiliateSeatUsage(this.prisma, id, now);
+  }
+
+  /**
+   * Under the workspace lock, so the previous value recorded in the audit entry is exact and no invitation or
+   * acceptance interleaves. Lowering the limit below usage leaves every membership and invitation untouched.
+   */
+  updateSeatLimit(id: string, seatLimit: number | null, actor: SeatLimitActor, now: Date): Promise<SeatLimitResult> {
+    return this.prisma.$transaction(async (tx): Promise<SeatLimitResult> => {
+      await lockWorkspace(tx, id);
+      const workspace = await tx.workspace.findUnique({ where: { id }, select: { seatLimit: true } });
+      if (!workspace) return { status: 'not-found' };
+      if (workspace.seatLimit !== seatLimit) {
+        await tx.workspace.update({ where: { id }, data: { seatLimit } });
+        await insertAuditEntry(tx, {
+          action: 'workspace.seat_limit_updated',
+          userId: actor.userId,
+          workspaceId: id,
+          ip: actor.ip,
+          meta: { previousSeatLimit: workspace.seatLimit, newSeatLimit: seatLimit },
+        });
+      }
+      const usage = await readAffiliateSeatUsage(tx, id, now);
+      return usage ? { status: 'updated', usage } : { status: 'not-found' };
+    });
   }
 
   archive(id: string, now: Date): Promise<LifecycleResult> {

@@ -7,6 +7,7 @@ import {
   type User,
   type Workspace,
 } from '@prisma/client';
+import { assertSeatCanBeOccupied } from './affiliate-seats.js';
 import { lockWorkspace } from './workspace.repository.js';
 
 /** The part of a membership that scopes a session: which workspace, with which role. */
@@ -51,9 +52,12 @@ async function revokeWorkspaceSessions(
 }
 
 
+
 export async function grantMembership(tx: Prisma.TransactionClient, grant: GrantedMembership): Promise<PrincipalChange> {
   const { userId, workspaceId, role, canEditDossiers, previousPrincipal, now } = grant;
+  const existing = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
   if (role === Role.AFFILIATE) {
+    await assertSeatCanBeOccupied(tx, workspaceId, existing ? 0 : 1);
     await tx.membership.upsert({
       where: { userId_workspaceId: { userId, workspaceId } },
       update: {},
@@ -68,12 +72,15 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
     return { previousPrincipalId: null, previousPrincipalOutcome: null };
   }
 
+  const previous = await tx.membership.findFirst({
+    where: { workspaceId, role: Role.PRINCIPAL, userId: { not: userId } },
+  });
+  const keptAsAffiliate = previous !== null && previousPrincipal === PreviousPrincipalOutcome.KEEP_AS_AFFILIATE;
+  const promotedAffiliate = existing?.role === Role.AFFILIATE;
+  await assertSeatCanBeOccupied(tx, workspaceId, (keptAsAffiliate ? 1 : 0) - (promotedAffiliate ? 1 : 0));
   await tx.invitation.updateMany({
     where: { workspaceId, role: Role.PRINCIPAL, acceptedAt: null, revokedAt: null },
     data: { revokedAt: now },
-  });
-  const previous = await tx.membership.findFirst({
-    where: { workspaceId, role: Role.PRINCIPAL, userId: { not: userId } },
   });
   if (previous) {
     if (previousPrincipal === PreviousPrincipalOutcome.KEEP_AS_AFFILIATE) {

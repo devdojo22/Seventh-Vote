@@ -13,6 +13,7 @@ import {
   idParamSchema,
   inviteAffiliateSchema,
   updateMemberSchema,
+  updateSeatLimitSchema,
   updateSettingsSchema,
 } from './workspace.validation.js';
 
@@ -20,6 +21,7 @@ export interface WorkspaceController {
   create: RequestHandler;
   listAll: RequestHandler;
   designatePrincipal: RequestHandler;
+  updateSeatLimit: RequestHandler;
   archive: RequestHandler;
   restore: RequestHandler;
   deletePermanently: RequestHandler;
@@ -60,6 +62,13 @@ export function createWorkspaceController(workspaces: WorkspaceService): Workspa
         requestContext(req),
       );
       res.status(result.status === 'invited' ? 202 : 200).json(result);
+    },
+
+    updateSeatLimit: async (req: Request, res: Response) => {
+      const input = parseBody(updateSeatLimitSchema, req.body);
+      res.json(
+        await workspaces.updateSeatLimit(accessClaims(req).sub, idParam(req, 'workspaceId'), input, requestContext(req)),
+      );
     },
 
     archive: async (req: Request, res: Response) => {

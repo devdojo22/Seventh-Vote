@@ -5,7 +5,8 @@ export type ErrorCode =
   | 'invalid_code'
   | 'too_many_attempts'
   | 'resend_cooldown'
-  | 'account_exists';
+  | 'account_exists'
+  | 'affiliate_seat_limit_reached';
 
 export interface ErrorResponse {
   error: string;
@@ -88,9 +89,24 @@ export interface WorkspaceSettingsResponse {
   updatedAt: string;
 }
 
+export interface AffiliateSeatsResponse {
+  seatLimit: number | null;
+  seatsUsed: number;
+  seatsAvailable: number | null;
+  isOverLimit: boolean;
+  activeAffiliates: number;
+  pendingInvitations: number;
+}
+
 export interface AdminWorkspaceResponse extends WorkspaceResponse {
   principal: { userId: string; email: string; name: string | null } | null;
   memberCount: number;
+  affiliateSeats: AffiliateSeatsResponse;
+}
+
+export interface MembersResponse {
+  members: MemberResponse[];
+  affiliateSeats: AffiliateSeatsResponse;
 }
 
 export type DesignatePrincipalResponse =

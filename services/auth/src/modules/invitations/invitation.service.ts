@@ -45,8 +45,19 @@ export interface NewInvitationRequest {
   invitedById: string;
 }
 
+const AFFILIATE_SEATS_FULL =
+  'This workspace has no Affiliate seats available. Free a seat by revoking an invitation or removing an Affiliate, or ask a platform administrator to raise the limit.';
+const KEEP_PREVIOUS_PRINCIPAL_NEEDS_SEAT =
+  'Keeping the current Principal as an Affiliate needs a free Affiliate seat. Free a seat, raise the seat limit, or remove the current Principal instead.';
+const NO_SEAT_TO_ACCEPT =
+  'This workspace has no free Affiliate seat right now, so the invitation cannot be accepted yet. Ask the workspace Principal to free a seat, then open the link again.';
+
 function accountExists(): HttpError {
   return new HttpError(409, ACCOUNT_EXISTS, { code: 'account_exists' });
+}
+
+function seatLimitReached(message: string): HttpError {
+  return new HttpError(409, message, { code: 'affiliate_seat_limit_reached' });
 }
 
 export function toInvitationResponse(invitation: Invitation): InvitationResponse {
@@ -71,7 +82,7 @@ export class InvitationService {
     }
     const token = randomToken();
     const now = this.deps.now();
-    const invitation = await this.deps.invitations.create({
+    const created = await this.deps.invitations.create({
       workspaceId: workspace.id,
       email,
       role,
@@ -82,6 +93,13 @@ export class InvitationService {
       expiresAt: new Date(now.getTime() + this.deps.ttlMs),
       createdAt: now,
     });
+    if (created.status === 'workspace-unavailable') {
+      throw new HttpError(409, 'The workspace was archived or deleted meanwhile.');
+    }
+    if (created.status === 'seat-limit') {
+      throw seatLimitReached(role === Role.AFFILIATE ? AFFILIATE_SEATS_FULL : KEEP_PREVIOUS_PRINCIPAL_NEEDS_SEAT);
+    }
+    const { invitation } = created;
 
     try {
       await this.deps.email.send(
@@ -243,6 +261,15 @@ export class InvitationService {
         meta: { invitationId: invitation.id, reason: 'super-admin' },
       });
       throw new HttpError(409, SUPER_ADMIN_NO_WORKSPACE_ROLE);
+    }
+    if (result.status === 'seat-limit') {
+      await this.deps.audit.record(context, {
+        action: 'invitation.accept_failed',
+        userId: null,
+        workspaceId: invitation.workspaceId,
+        meta: { invitationId: invitation.id, reason: 'seat-limit' },
+      });
+      throw seatLimitReached(NO_SEAT_TO_ACCEPT);
     }
     await this.deps.audit.record(context, {
       action: 'invitation.accepted',
