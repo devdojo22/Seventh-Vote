@@ -21,6 +21,7 @@ export interface NewInvitation {
   email: string;
   role: Role;
   canEditDossiers: boolean;
+  canApproveDossiers: boolean;
   previousPrincipalOutcome: PreviousPrincipalOutcome | null;
   tokenHash: string;
   invitedById: string | null;
@@ -90,6 +91,7 @@ async function grant(
     workspaceId: invitation.workspaceId,
     role: invitation.role,
     canEditDossiers: invitation.canEditDossiers,
+    canApproveDossiers: invitation.canApproveDossiers,
     previousPrincipal: invitation.previousPrincipalOutcome ?? PreviousPrincipalOutcome.REMOVE,
     now,
   });

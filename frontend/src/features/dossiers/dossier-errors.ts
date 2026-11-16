@@ -37,6 +37,10 @@ export function currentVersionFromConflict(error: unknown): number | null {
   return typeof details.currentVersionNo === 'number' ? details.currentVersionNo : null;
 }
 
+export function isStatusUnchanged(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'status_unchanged';
+}
+
 /** The dossier exists, but not the version asked for (or the URL's version isn't a version number). */
 export class VersionNotFoundError extends Error {
   override readonly name = 'VersionNotFoundError';

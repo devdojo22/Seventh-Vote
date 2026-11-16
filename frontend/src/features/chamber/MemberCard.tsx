@@ -2,6 +2,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { ArrowUpRightIcon } from '@/components/ui/icons';
 import { Meter } from '@/components/ui/Meter';
+import { UnreviewedBadge } from '@/features/dossiers/DossierBadges'; // M4/01
 import {
   alignment,
   POSTURE_CLASSES,
@@ -56,6 +57,7 @@ export function MemberCard({ member, onOpen }: MemberCardProps) {
       <span className="mt-auto flex flex-wrap items-center gap-1.5">
         <Badge className={POSTURE_CLASSES[posture]}>{postureLabel(posture)} posture</Badge>
         {yourCall && <Badge className={YOUR_CALL_BADGE_CLASS}>Your call: {yourCall}</Badge>}
+        {member.basis === 'unreviewed' && <UnreviewedBadge />}
       </span>
 
       <span className="mt-4 grid gap-2 border-t border-line2 pt-3.5 text-[11px] font-medium text-muted">

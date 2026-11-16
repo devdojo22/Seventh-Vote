@@ -16,7 +16,12 @@ import type { InvitationService } from '../invitations/invitation.service.js';
 import type { UserRepository } from '../users/user.repository.js';
 import { displayName } from '../users/user.service.js';
 import { toAffiliateSeats } from './affiliate-seats.js';
-import type { MembershipRepository, MembershipWithUser, TransferResult } from './membership.repository.js';
+import type {
+  DossierGrants,
+  MembershipRepository,
+  MembershipWithUser,
+  TransferResult,
+} from './membership.repository.js';
 import { WORKSPACE_ARCHIVED } from './workspace-access.service.js';
 import type {
   CreateWorkspaceInput,
@@ -43,6 +48,7 @@ function toMemberResponse(membership: MembershipWithUser): MemberResponse {
     name: displayName(membership.user),
     role: membership.role,
     canEditDossiers: membership.canEditDossiers,
+    canApproveDossiers: membership.canApproveDossiers,
     joinedAt: membership.createdAt.toISOString(),
   };
 }
@@ -171,6 +177,7 @@ export class WorkspaceService {
         email,
         role: Role.PRINCIPAL,
         canEditDossiers: false,
+        canApproveDossiers: false,
         previousPrincipalOutcome: previousPrincipal,
         invitedById: actorId,
       },
@@ -239,6 +246,7 @@ export class WorkspaceService {
         email: input.email,
         role: Role.AFFILIATE,
         canEditDossiers: input.canEditDossiers,
+        canApproveDossiers: input.canApproveDossiers,
         previousPrincipalOutcome: null,
         invitedById: actorId,
       },
@@ -260,21 +268,21 @@ export class WorkspaceService {
     return this.deps.invitations.revoke(actorId, workspaceId, invitationId, roles, context);
   }
 
-  async setDossierEdit(
+  async setDossierGrants(
     actorId: string,
     workspaceId: string,
     userId: string,
-    canEditDossiers: boolean,
+    grants: DossierGrants,
     context: RequestContext,
   ): Promise<MemberResponse> {
     await this.requireAffiliate(userId, workspaceId, 'The Principal always has every permission');
-    const updated = await this.deps.memberships.setAffiliateDossierEdit(userId, workspaceId, canEditDossiers);
+    const updated = await this.deps.memberships.setAffiliateDossierGrants(userId, workspaceId, grants);
     if (!updated) throw new HttpError(404, 'Member not found');
     await this.deps.audit.record(context, {
       action: 'membership.updated',
       userId: actorId,
       workspaceId,
-      meta: { memberId: userId, canEditDossiers },
+      meta: { memberId: userId, ...grants },
     });
     return toMemberResponse(updated);
   }

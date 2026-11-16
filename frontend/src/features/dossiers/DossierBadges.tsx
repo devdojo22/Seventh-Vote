@@ -31,6 +31,14 @@ export function StanceLabelBadge({ value }: { value: StanceLabelValue }) {
   return <Badge className={STANCE_LABEL_CLASSES[value]}>{STANCE_LABEL_LABELS[value]}</Badge>;
 }
 
+export function UnreviewedBadge() {
+  return <Badge className="border border-gold/40 bg-amber-bg text-amber">Unreviewed draft</Badge>;
+}
+
+export function SelfApprovedBadge() {
+  return <Badge>Self-approved</Badge>;
+}
+
 export function ArchivedBadge() {
   return (
     <Badge className="border border-line bg-paper text-muted">

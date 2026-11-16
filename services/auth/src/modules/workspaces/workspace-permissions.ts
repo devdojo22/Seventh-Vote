@@ -3,7 +3,7 @@ import type { WorkspacePermissions } from '../../shared/types/api.types.js';
 
 
 export type WorkspaceGrant =
-  | { kind: 'member'; role: Role; canEditDossiers: boolean }
+  | { kind: 'member'; role: Role; canEditDossiers: boolean; canApproveDossiers: boolean }
   | { kind: 'platform-operator' };
 
 const ALL: WorkspacePermissions = {
@@ -11,6 +11,7 @@ const ALL: WorkspacePermissions = {
   configureWorkspace: true,
   viewDossiers: true,
   editDossiers: true,
+  approveDossiers: true,
   runRehearsals: true,
   viewResults: true,
 };
@@ -28,6 +29,7 @@ export function permissionsFor(grant: WorkspaceGrant): WorkspacePermissions {
     configureWorkspace: false,
     viewDossiers: true,
     editDossiers: grant.canEditDossiers,
+    approveDossiers: grant.canApproveDossiers,
     runRehearsals: true,
     viewResults: true,
   };

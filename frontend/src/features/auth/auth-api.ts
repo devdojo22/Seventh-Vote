@@ -147,6 +147,7 @@ export interface CurrentUser {
   activeWorkspaceId: string | null;
   role: Role | null;
   canEditDossiers: boolean;
+  canApproveDossiers: boolean;
   permissions: WorkspacePermissions | null;
   workspaces: WorkspaceAccess[];
 }
@@ -156,6 +157,7 @@ const permissionsSchema = z.object({
   configureWorkspace: z.boolean(),
   viewDossiers: z.boolean(),
   editDossiers: z.boolean(),
+  approveDossiers: z.boolean(),
   runRehearsals: z.boolean(),
   viewResults: z.boolean(),
 });
@@ -172,6 +174,7 @@ const currentUserSchema = z.object({
   activeWorkspaceId: z.guid().nullable(),
   role: z.enum(ROLES).nullable(),
   canEditDossiers: z.boolean(),
+  canApproveDossiers: z.boolean(),
   permissions: permissionsSchema.nullable(),
   workspaces: z.array(z.object({ id: z.guid(), name: z.string(), role: z.enum(ROLES) })),
 });

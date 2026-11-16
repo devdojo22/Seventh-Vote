@@ -1,6 +1,7 @@
 import { HeaderStat, PageHeader } from '@/components/PageHeader';
+import { Callout } from '@/components/ui/Callout'; // M4/01
 import { SectionHeading } from '@/components/ui/SectionHeading';
-import { councilOfficers } from '@/lib/members';
+import { councilOfficers, UNREVIEWED_EXPLANATION, unreviewedSummary } from '@/lib/members';
 import { useAppStore } from '@/stores/app-store';
 import { useCouncilStore } from '@/stores/council-store';
 import { MemberCard } from './MemberCard';
@@ -10,6 +11,7 @@ export function ChamberPage() {
   const config = useCouncilStore((s) => s.config);
   const openMember = useAppStore((s) => s.openMember);
   const officers = councilOfficers(members, config.leadershipFallback);
+  const unreviewed = unreviewedSummary(members)
 
   return (
     <section className="space-y-8">
@@ -49,6 +51,7 @@ export function ChamberPage() {
           title={`${members.length} seats`}
           note="District order · Select a member for full record"
         />
+        {unreviewed && <Callout title={unreviewed}>{UNREVIEWED_EXPLANATION}</Callout>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {members.map((m) => (
             <MemberCard key={m.id} member={m} onOpen={openMember} />

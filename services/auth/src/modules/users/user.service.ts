@@ -23,7 +23,12 @@ function accessIn(user: User, active: Membership | null): AccessResponse {
         : permissionsFor(
             user.isSuperAdmin
               ? { kind: 'platform-operator' }
-              : { kind: 'member', role: active.role, canEditDossiers: active.canEditDossiers },
+              : {
+                  kind: 'member',
+                  role: active.role,
+                  canEditDossiers: active.canEditDossiers,
+                  canApproveDossiers: active.canApproveDossiers,
+                },
           ),
   };
 }
@@ -61,6 +66,7 @@ export class UserService {
       emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
       canEditDossiers: active?.canEditDossiers ?? false,
+      canApproveDossiers: active?.canApproveDossiers ?? false,
       workspaces: memberships.map((membership) => ({
         id: membership.workspace.id,
         name: membership.workspace.name,

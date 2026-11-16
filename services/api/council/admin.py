@@ -48,7 +48,7 @@ class VoiceQuoteInline(ReadOnlyInline):
 
 class ReviewStatusChangeInline(ReadOnlyInline):
     model = ReviewStatusChange
-    fields = ["from_status", "to_status", "changed_by", "changed_at"]
+    fields = ["from_status", "to_status", "note", "self_approved", "changed_by", "changed_at"]
     readonly_fields = ["changed_at"]
 
 
@@ -94,8 +94,8 @@ class VoiceQuoteAdmin(ReadOnlyAdmin):
 
 @admin.register(ReviewStatusChange)
 class ReviewStatusChangeAdmin(ReadOnlyAdmin):
-    list_display = ["version", "from_status", "to_status", "changed_by", "changed_at"]
-    list_filter = ["to_status"]
+    list_display = ["version", "from_status", "to_status", "self_approved", "changed_by", "changed_at"]
+    list_filter = ["to_status", "self_approved"]
 
 
 @admin.register(DossierArchiveEvent)

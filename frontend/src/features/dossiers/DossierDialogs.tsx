@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { CONTROL_CLASS, Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
-import {
-  REVIEW_STATUS_DESCRIPTIONS,
-  REVIEW_STATUS_DOTS,
-  REVIEW_STATUS_LABELS,
-} from '@/data/dossier-options';
-import { REVIEW_STATUSES, type ReviewStatus } from '@/types/dossier';
+
+export const REVIEW_NOTE_MAX = 500;
 
 function DialogError({ message }: { message: string | null }) {
   if (!message) return null;
@@ -17,9 +14,9 @@ function DialogError({ message }: { message: string | null }) {
   );
 }
 
-export function ReviewStatusDialog({
+
+export function SendBackDialog({
   name,
-  current,
   versionNo,
   busy,
   error,
@@ -27,84 +24,131 @@ export function ReviewStatusDialog({
   onConfirm,
 }: {
   name: string;
-  current: ReviewStatus;
   versionNo: number;
   busy: boolean;
   error: string | null;
-  /** Must be stable across renders. */
   onCancel: () => void;
-  onConfirm: (status: ReviewStatus) => void;
+  onConfirm: (note: string) => void;
 }) {
-  const [status, setStatus] = useState<ReviewStatus>(current);
-  const unchanged = status === current;
+  const [note, setNote] = useState('');
+  const [noteError, setNoteError] = useState<string | undefined>(undefined);
+
+  const validate = (value: string): string | undefined => {
+    const trimmed = value.trim();
+    if (trimmed === '') return 'Add a note explaining what needs to change.';
+    if (trimmed.length > REVIEW_NOTE_MAX) {
+      return `Keep the note to ${String(REVIEW_NOTE_MAX)} characters or fewer.`;
+    }
+    return undefined;
+  };
 
   return (
-    <Modal labelledBy="review-status-title" onClose={onCancel}>
+    <Modal labelledBy="send-back-title" onClose={onCancel}>
       <form
         className="grid gap-5 overflow-y-auto p-5 sm:p-6"
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (!unchanged) onConfirm(status);
+          const problem = validate(note);
+          setNoteError(problem);
+          if (problem === undefined) onConfirm(note.trim());
         }}
       >
         <div>
-          <h2 id="review-status-title" className="font-display text-xl font-bold text-navy">
-            Review status
+          <h2 id="send-back-title" className="font-display text-xl font-bold text-navy">
+            Send back to draft
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted">
-            For version {versionNo} of {name}’s dossier. Every change is kept in the review history.
+            Version {versionNo} of {name}’s dossier goes back to draft. Your note is kept in the
+            review history.
           </p>
         </div>
 
-        <fieldset className="grid gap-2">
-          <legend className="sr-only">Status</legend>
-          {REVIEW_STATUSES.map((s) => {
-            const checked = status === s;
-            return (
-              <label
-                key={s}
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-gold ${
-                  checked ? 'border-navy bg-paper' : 'border-line hover:border-navy/25'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="review-status"
-                  value={s}
-                  checked={checked}
-                  onChange={() => setStatus(s)}
-                  className="mt-1 size-4 shrink-0 cursor-pointer accent-navy"
-                />
-                <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-[13px] font-semibold text-navy">
-                    <span
-                      aria-hidden="true"
-                      className={`size-1.5 rounded-full ${REVIEW_STATUS_DOTS[s]}`}
-                    />
-                    {REVIEW_STATUS_LABELS[s]}
-                    {s === current && (
-                      <span className="text-[11px] font-medium text-muted">· current</span>
-                    )}
-                  </span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-muted">
-                    {REVIEW_STATUS_DESCRIPTIONS[s]}
-                  </span>
-                </span>
-              </label>
-            );
-          })}
-        </fieldset>
+        <Field id="send-back-note" label="Note" required error={noteError}>
+          <textarea
+            id="send-back-note"
+            rows={4}
+            value={note}
+            maxLength={REVIEW_NOTE_MAX}
+            data-autofocus
+            aria-invalid={noteError !== undefined}
+            aria-describedby={noteError ? 'send-back-note-error' : undefined}
+            onChange={(e) => {
+              setNote(e.target.value);
+              if (noteError !== undefined) setNoteError(validate(e.target.value));
+            }}
+            className={CONTROL_CLASS}
+          />
+        </Field>
 
         <DialogError message={error} />
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={unchanged || busy} aria-busy={busy}>
-            {busy ? 'Saving…' : 'Set status'}
+          <Button type="submit" disabled={busy} aria-busy={busy}>
+            {busy ? 'Sending back…' : 'Send back'}
           </Button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+export function ApproveDialog({
+  name,
+  versionNo,
+  fromDraft,
+  ownVersion,
+  replacesVersionNo,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  versionNo: number;
+  fromDraft: boolean;
+  ownVersion: boolean;
+  replacesVersionNo: number | null;
+  busy: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal labelledBy="approve-title" onClose={onCancel}>
+      <div className="grid gap-4 p-5 sm:p-6">
+        <h2 id="approve-title" className="font-display text-xl font-bold text-navy">
+          Approve version {versionNo} of {name}’s dossier?
+        </h2>
+        <p className="text-sm leading-relaxed text-muted">
+          {replacesVersionNo === null
+            ? 'The simulator starts using this version.'
+            : `The simulator stops using version ${String(replacesVersionNo)} and starts using this one.`}{' '}
+          <strong className="font-semibold text-ink">Approval can’t be undone</strong>: this version
+          is locked, and later changes need a new draft.
+        </p>
+        {(fromDraft || ownVersion) && (
+          <ul className="grid list-disc gap-1 pl-5 text-sm leading-relaxed text-amber">
+            {fromDraft && (
+              <li>This version is still a draft and hasn’t been submitted for review.</li>
+            )}
+            {ownVersion && (
+              <li>You saved this version, so the review history will show it as self-approved.</li>
+            )}
+          </ul>
+        )}
+        <DialogError message={error} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={onCancel} data-autofocus>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={busy} aria-busy={busy}>
+            {busy ? 'Approving…' : 'Approve version'}
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -146,7 +190,6 @@ export function ArchiveDossierDialog({
   name: string;
   busy: boolean;
   error: string | null;
-  /** Must be stable across renders. */
   onCancel: () => void;
   onConfirm: () => void;
 }) {

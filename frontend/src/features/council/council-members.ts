@@ -1,8 +1,7 @@
 import { getWorkspaceSettings } from '@/features/access/access-api';
 import {
-  getDossier,
-  listDossiers,
-  type DossierDetail,
+  getCouncil,
+  type CouncilMemberDetail,
   type KeyRecord,
 } from '@/features/dossiers/dossier-api';
 import { RECORD_OUTCOME_LABELS } from '@/data/dossier-options';
@@ -19,7 +18,7 @@ function recordDateText(record: KeyRecord): string {
 }
 
 
-export function dossierToMember({ member, currentVersion: v }: DossierDetail): Member {
+export function dossierToMember({ member, basis, version: v }: CouncilMemberDetail): Member {
   const voice = v.voiceEvidence;
   const example = voice.example;
   const mayor = v.mayorAlignment;
@@ -30,6 +29,8 @@ export function dossierToMember({ member, currentVersion: v }: DossierDetail): M
 
   return {
     id: member.slug || member.id,
+    basis, 
+    version_no: v.versionNo,
     name: v.name,
     district: v.district,
     took_office: v.tookOffice,
@@ -108,8 +109,7 @@ export interface CouncilData {
 }
 
 export async function loadCouncil(workspaceId: string): Promise<CouncilData> {
-  const [summaries, info] = await Promise.all([listDossiers(), workspaceInfo(workspaceId)]);
-  const details = await Promise.all(summaries.map((s) => getDossier(s.id)));
-  const members = details.map(dossierToMember).sort(byDistrict);
+  const [council, info] = await Promise.all([getCouncil(), workspaceInfo(workspaceId)]);
+  const members = council.map(dossierToMember).sort(byDistrict);
   return { members, profile: councilProfile(members, info) };
 }

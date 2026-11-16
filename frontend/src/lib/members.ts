@@ -52,7 +52,18 @@ export function recordDepth(member: Member): { label: RecordDepthLabel; percent:
   return { label: 'Thin', percent };
 }
 
-/** Short role line for a member card: leadership role, else top committee chairmanship. */
+export const UNREVIEWED_EXPLANATION =
+  'No version of their dossier has been approved yet, so the simulation uses their latest saved version. ' +
+  'Once a version is approved, the simulation uses that one.';
+
+export function unreviewedSummary(members: readonly Member[]): string | null {
+  const unreviewed = members.filter((m) => m.basis === 'unreviewed').length;
+  if (unreviewed === 0) return null;
+  const verb = unreviewed === 1 ? 'member is' : 'members are';
+  const noun = unreviewed === 1 ? 'an unreviewed draft' : 'unreviewed drafts';
+  return `${String(unreviewed)} of ${String(members.length)} ${verb} based on ${noun}.`;
+}
+
 export function primaryRole(member: Member): string {
   if (!NO_LEADERSHIP_ROLE.test(member.leadership_role)) return member.leadership_role;
   const chaired = Object.entries(member.committees).find(([, role]) => /chair/i.test(role));

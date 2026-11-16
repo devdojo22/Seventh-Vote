@@ -10,15 +10,19 @@ const memberSchema = z.object({
   name: z.string().nullable(),
   role: z.enum(ROLES),
   canEditDossiers: z.boolean(),
+  canApproveDossiers: z.boolean(),
   joinedAt: z.iso.datetime({ offset: true }),
 });
 export type Member = z.infer<typeof memberSchema>;
+
+export type DossierGrants = Partial<Pick<Member, 'canEditDossiers' | 'canApproveDossiers'>>;
 
 const invitationSchema = z.object({
   id: z.guid(),
   email: z.string().min(1),
   role: z.enum(ROLES),
   canEditDossiers: z.boolean(),
+  canApproveDossiers: z.boolean(),
   expiresAt: z.iso.datetime({ offset: true }),
   createdAt: z.iso.datetime({ offset: true }),
 });
@@ -116,16 +120,16 @@ export function listMembers(workspaceId: string): Promise<WorkspaceMembers> {
   );
 }
 
-export function setMemberDossierEdit(
+export function setMemberDossierGrants(
   workspaceId: string,
   userId: string,
-  canEditDossiers: boolean,
+  grants: DossierGrants,
 ): Promise<Member> {
   return withAccessToken((bearer) =>
     apiRequest(`${workspacePath(workspaceId)}/members/${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       bearer,
-      body: { canEditDossiers },
+      body: grants,
       schema: memberSchema,
     }),
   );
@@ -154,13 +158,13 @@ export function listInvitations(workspaceId: string): Promise<Invitation[]> {
 export function inviteAffiliate(
   workspaceId: string,
   email: string,
-  canEditDossiers: boolean,
+  grants: Required<DossierGrants>,
 ): Promise<Invitation> {
   return withAccessToken((bearer) =>
     apiRequest(`${workspacePath(workspaceId)}/invitations`, {
       method: 'POST',
       bearer,
-      body: { email, canEditDossiers },
+      body: { email, ...grants },
       schema: invitationSchema,
     }),
   );

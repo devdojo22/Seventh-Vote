@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from council import review
 from council.models import (
     DatePrecision,
     Dossier,
@@ -11,6 +12,7 @@ from council.models import (
     ReviewStatusChange,
     VoiceQuote,
 )
+from council.simulation_version import simulation_version
 
 STANCE_LABELS = ["support", "lean_support", "neutral", "lean_oppose", "oppose", "unknown"]
 
@@ -175,8 +177,13 @@ class DossierVersionSerializer(DossierContentSerializer):
     changeNote = serializers.CharField(source="change_note", read_only=True)
     createdBy = serializers.UUIDField(source="created_by", read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    # Who submitted the version while it is in review (only they may withdraw it); null otherwise.
+    submittedBy = serializers.SerializerMethodField()
     keyRecords = KeyRecordSerializer(source="key_records.all", many=True, read_only=True)
     voiceEvidence = serializers.SerializerMethodField()
+
+    def get_submittedBy(self, version):
+        return review.submitter_of(version) if version.status == ReviewStatus.IN_REVIEW else None
 
     def get_voiceEvidence(self, version):
         return {
@@ -230,10 +237,28 @@ class DossierListSerializer(serializers.ModelSerializer):
 class DossierDetailSerializer(serializers.ModelSerializer):
     member = MemberSerializer(read_only=True)
     currentVersion = DossierVersionSerializer(source="current_version", read_only=True)
+    simulationVersion = serializers.SerializerMethodField()
 
     class Meta:
         model = Dossier
-        fields = ["id", "member", "currentVersion"]
+        fields = ["id", "member", "currentVersion", "simulationVersion"]
+
+    def get_simulationVersion(self, dossier):
+        """Which version the simulator reads (simulation_version()), so the dossier page can show it when it
+        differs from the current version."""
+        chosen = simulation_version(dossier)
+        return {"versionNo": chosen.version.version_no, "basis": chosen.basis.value}
+
+
+# M4/01: council member with the version the simulator reads.
+class CouncilMemberSerializer(serializers.Serializer):
+    """One council member as the simulator reads them: the dossier, and the version simulation_version()
+    picked. `basis` is "approved", or "unreviewed" when no version has been approved yet."""
+
+    id = serializers.UUIDField(source="dossier.id", read_only=True)
+    member = MemberSerializer(source="dossier.member", read_only=True)
+    basis = serializers.CharField(read_only=True)
+    version = DossierVersionSerializer(read_only=True)
 
 
 class MemberUpdateSerializer(serializers.ModelSerializer):
@@ -283,6 +308,8 @@ class ReviewChangeRequestSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=ReviewStatus.choices)
     # The version the reviewer looked at. Required, so a review never lands on a newer version by default.
     versionNo = serializers.IntegerField(min_value=1)
+    # Why: required when an approver sends a version back to draft (enforced in council.review).
+    note = serializers.CharField(max_length=CHANGE_NOTE_MAX, allow_blank=True, default="")
 
 
 class ReviewStatusChangeSerializer(serializers.ModelSerializer):
@@ -291,10 +318,11 @@ class ReviewStatusChangeSerializer(serializers.ModelSerializer):
     toStatus = serializers.CharField(source="to_status")
     changedBy = serializers.UUIDField(source="changed_by")
     changedAt = serializers.DateTimeField(source="changed_at")
+    selfApproved = serializers.BooleanField(source="self_approved")
 
     class Meta:
         model = ReviewStatusChange
-        fields = ["id", "versionNo", "fromStatus", "toStatus", "changedBy", "changedAt"]
+        fields = ["id", "versionNo", "fromStatus", "toStatus", "changedBy", "changedAt", "note", "selfApproved"]
 
 
 class DossierArchiveEventSerializer(serializers.ModelSerializer):

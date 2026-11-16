@@ -94,14 +94,16 @@ model Workspace {
 /// A workspace that has a Principal is never left without one: deferred trigger "memberships_keep_principal",
 /// and a super-admin never holds a membership: trigger "memberships_reject_super_admin" (both migration 0015).
 model Membership {
-  id              String   @id @default(uuid()) @db.Uuid
-  userId          String   @map("user_id") @db.Uuid
-  workspaceId     String   @map("workspace_id") @db.Uuid
-  role            Role     @default(AFFILIATE)
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  workspaceId        String   @map("workspace_id") @db.Uuid
+  role               Role     @default(AFFILIATE)
   /// Granted by the Principal to selected Affiliates. A Principal can always edit dossiers.
-  canEditDossiers Boolean  @default(false) @map("can_edit_dossiers")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  canEditDossiers    Boolean  @default(false) @map("can_edit_dossiers")
+  /// Granted by the Principal to selected Affiliates. A Principal can always approve dossiers.
+  canApproveDossiers Boolean  @default(false) @map("can_approve_dossiers")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -170,6 +172,8 @@ model Invitation {
   email                    String
   role                     Role
   canEditDossiers          Boolean                   @default(false) @map("can_edit_dossiers")
+  /// AFFILIATE invitations only: copied to the membership's canApproveDossiers on acceptance.
+  canApproveDossiers       Boolean                   @default(false) @map("can_approve_dossiers")
   /// PRINCIPAL invitations only (CHECK, migration 0015): applied to the previous Principal on acceptance.
   /// NULL means REMOVE.
   previousPrincipalOutcome PreviousPrincipalOutcome? @map("previous_principal_outcome")

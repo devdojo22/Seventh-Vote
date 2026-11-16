@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/PageHeader';
 import { Avatar } from '@/components/ui/Avatar';
@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Loader } from '@/components/ui/Loader';
 import { ArchiveIcon, PencilIcon } from '@/components/ui/icons';
 import { useAppStore } from '@/stores/app-store';
-import type { ReviewStatus } from '@/types/dossier';
+import { useCurrentUser } from '@/stores/auth-session-store';
 import {
   archiveDossier,
   dossierHref,
@@ -18,15 +18,29 @@ import {
   setReviewStatus,
   type DossierDetail,
 } from './dossier-api';
-import { ArchivedBadge, ReviewStatusBadge, VersionBadge } from './DossierBadges';
+import { ArchivedBadge, ReviewStatusBadge, UnreviewedBadge, VersionBadge } from './DossierBadges';
 import { DossierContentView } from './DossierContentView';
-import { ArchiveDossierDialog, ReviewStatusDialog } from './DossierDialogs';
-import { currentVersionFromConflict, describeDossierError } from './dossier-errors';
+import { ApproveDialog, ArchiveDossierDialog, SendBackDialog } from './DossierDialogs';
+import {
+  currentVersionFromConflict,
+  describeDossierError,
+  isStatusUnchanged,
+} from './dossier-errors';
 import { formatDateTime } from './dossier-format';
 import { ArchiveHistory, ReviewHistory, VersionHistory } from './DossierHistory';
 import { BackLink, DossierNotAvailable, LoadError } from './DossierStates';
 import { EvidenceTab } from './EvidenceList';
 import { PRIMARY_LINK_CLASS } from './link-classes';
+import {
+  REVIEW_ACTION_DONE,
+  REVIEW_ACTION_LABELS,
+  REVIEW_ACTION_TARGETS,
+  reviewActionsFor,
+  withdrawBlockedReason,
+  type ReviewAction,
+} from './review-actions';
+
+type DialogKind = 'approve' | 'sendBack' | 'archive';
 import { useAuthorName, useDossierAccess } from './use-dossier-access';
 import { useLoad } from './use-load';
 
@@ -46,16 +60,19 @@ function isTab(value: string | null): value is TabId {
 function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged: () => void }) {
   const navigate = useNavigate();
   const access = useDossierAccess();
+  const user = useCurrentUser();
   const authorName = useAuthorName();
   const showToast = useAppStore((s) => s.showToast);
   const [params, setParams] = useSearchParams();
-  const [dialog, setDialog] = useState<'review' | 'archive' | null>(null);
+  const [dialog, setDialog] = useState<DialogKind | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const [reviewing, setReviewing] = useState<ReviewAction | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
 
-  const openDialog = (kind: 'review' | 'archive') => {
+  const openDialog = (kind: DialogKind) => {
     setDialogError(null);
     setDialog(kind);
   };
@@ -67,6 +84,9 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
 
   const { member, currentVersion: version } = dossier;
   const canEdit = access.canEdit && !member.archived;
+  const reviewActions = member.archived ? [] : reviewActionsFor(version, access, user.id);
+  const withdrawBlocked = member.archived ? null : withdrawBlockedReason(version, access, user.id);
+  const simulation = dossier.simulationVersion;
   const tabParam = params.get('tab');
   const tab: TabId = isTab(tabParam) ? tabParam : 'profile';
   const [visited, setVisited] = useState<ReadonlySet<TabId>>(() => new Set([tab]));
@@ -82,6 +102,8 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
     after: () => void,
     onError?: (error: unknown) => boolean,
   ) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setDialogError(null);
     try {
@@ -92,6 +114,7 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
     } catch (error) {
       if (!onError?.(error)) setDialogError(describeDossierError(error));
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
@@ -101,22 +124,32 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
     onChanged();
   };
 
-  const onSetStatus = (status: ReviewStatus) =>
+  const onReview = (action: ReviewAction, note?: string) => {
+    if (inFlight.current) return;
+    setReviewing(action);
     void run(
-      () => setReviewStatus(dossier.id, status, version.versionNo),
-      'Review status updated',
+      () => setReviewStatus(dossier.id, REVIEW_ACTION_TARGETS[action], version.versionNo, note),
+      REVIEW_ACTION_DONE[action],
       () => {
         setReviewNotice(null);
         reloadAll();
       },
       (error) => {
-        if (currentVersionFromConflict(error) === null) return false;
+        if (isStatusUnchanged(error)) {
+          setDialog(null);
+          setReviewNotice(null);
+          reloadAll();
+          return true;
+        }
+        const inDialog = action === 'sendBack' || action === 'approve';
+        if (inDialog && currentVersionFromConflict(error) === null) return false;
         setDialog(null);
         setReviewNotice(describeDossierError(error));
         reloadAll();
         return true;
       },
-    );
+    ).finally(() => setReviewing(null));
+  };
 
   const onArchive = () =>
     void run(
@@ -141,15 +174,30 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
           'No district recorded'
         }
         aside={
-          canEdit && (
+          (canEdit || reviewActions.length > 0) && (
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <Button variant="secondary" onClick={() => openDialog('review')}>
-                Set review status
-              </Button>
-              <Link to={`${dossierHref(dossier)}/edit`} className={PRIMARY_LINK_CLASS}>
-                <PencilIcon className="size-4" />
-                Edit dossier
-              </Link>
+              {reviewActions.map((action) => (
+                <Button
+                  key={action}
+                  variant="secondary"
+                  disabled={busy}
+                  aria-busy={reviewing === action}
+                  onClick={() => {
+                    if (action === 'sendBack' || action === 'approve') openDialog(action);
+                    else onReview(action);
+                  }}
+                >
+                  {reviewing === action && action !== 'sendBack' && action !== 'approve'
+                    ? 'Saving…'
+                    : REVIEW_ACTION_LABELS[action]}
+                </Button>
+              ))}
+              {canEdit && (
+                <Link to={`${dossierHref(dossier)}/edit`} className={PRIMARY_LINK_CLASS}>
+                  <PencilIcon className="size-4" />
+                  Edit dossier
+                </Link>
+              )}
             </div>
           )
         }
@@ -159,6 +207,10 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
         <Callout title="Review status not changed">
           <span role="alert">{reviewNotice}</span>
         </Callout>
+      )}
+
+      {withdrawBlocked && (
+        <Callout title="You can’t withdraw this version">{withdrawBlocked}</Callout>
       )}
 
       {member.archived && (
@@ -182,6 +234,24 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
               Last saved {formatDateTime(version.createdAt)} by {authorName(version.createdBy)}
               {version.changeNote ? ` · “${version.changeNote}”` : ''}
             </p>
+            {!member.archived && (
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                {simulation.basis === 'unreviewed' ? (
+                  <>
+                    <UnreviewedBadge />
+                    No version has been approved yet, so the simulator uses this unreviewed version
+                    until one is.
+                  </>
+                ) : simulation.versionNo === version.versionNo ? (
+                  'The simulator uses this version.'
+                ) : (
+                  <>
+                    The simulator uses approved version {simulation.versionNo}, not this version{' '}
+                    {version.versionNo}, until this one is approved.
+                  </>
+                )}
+              </p>
+            )}
           </div>
         </div>
       </Card>
@@ -273,15 +343,31 @@ function DossierView({ dossier, onChanged }: { dossier: DossierDetail; onChanged
         </Card>
       )}
 
-      {dialog === 'review' && (
-        <ReviewStatusDialog
+      {dialog === 'approve' && (
+        <ApproveDialog
           name={member.name}
-          current={version.status}
+          versionNo={version.versionNo}
+          fromDraft={version.status === 'draft'}
+          ownVersion={version.createdBy === user.id}
+          replacesVersionNo={
+            simulation.basis === 'approved' && simulation.versionNo !== version.versionNo
+              ? simulation.versionNo
+              : null
+          }
+          busy={busy}
+          error={dialogError}
+          onCancel={closeDialog}
+          onConfirm={() => onReview('approve')}
+        />
+      )}
+      {dialog === 'sendBack' && (
+        <SendBackDialog
+          name={member.name}
           versionNo={version.versionNo}
           busy={busy}
           error={dialogError}
           onCancel={closeDialog}
-          onConfirm={onSetStatus}
+          onConfirm={(note) => onReview('sendBack', note)}
         />
       )}
       {dialog === 'archive' && (
