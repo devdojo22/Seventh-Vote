@@ -177,7 +177,8 @@ class VoiceQuote(models.Model):
 
 
 class ReviewStatusChange(models.Model):
-    """Append-only log of every review status change."""
+    """Append-only log of every review status change. `note` is the reviewer's reason (required when a version
+    is sent back); `self_approved` marks an approval by the user who saved that version."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     version = models.ForeignKey(DossierVersion, on_delete=models.PROTECT, related_name="status_changes")
@@ -185,6 +186,8 @@ class ReviewStatusChange(models.Model):
     to_status = models.CharField(max_length=20, choices=ReviewStatus.choices)
     changed_by = models.UUIDField()
     changed_at = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(blank=True, default="")
+    self_approved = models.BooleanField(default=False)
 
     class Meta:
         db_table = "review_status_changes"

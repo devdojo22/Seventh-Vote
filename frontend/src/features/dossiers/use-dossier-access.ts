@@ -5,6 +5,7 @@ import { useCurrentUser } from '@/stores/auth-session-store';
 export interface DossierAccess {
   canView: boolean;
   canEdit: boolean;
+  canApprove: boolean;
 }
 
 export function useDossierAccess(): DossierAccess {
@@ -13,6 +14,7 @@ export function useDossierAccess(): DossierAccess {
   return {
     canView: active && user.permissions?.viewDossiers === true,
     canEdit: active && user.permissions?.editDossiers === true,
+    canApprove: active && user.permissions?.approveDossiers === true,
   };
 }
 

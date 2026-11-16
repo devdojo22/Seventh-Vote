@@ -25,7 +25,7 @@ import {
   listMembers,
   removeMember,
   revokeInvitation,
-  setMemberDossierEdit,
+  setMemberDossierGrants,
   type AffiliateSeats,
   type Invitation,
   type Member,
@@ -41,6 +41,7 @@ const SMALL_BUTTON_CLASS =
 const inviteSchema = z.object({
   email: emailAddress('Enter an email address.'),
   canEditDossiers: z.boolean(),
+  canApproveDossiers: z.boolean(),
 });
 type InviteValues = z.infer<typeof inviteSchema>;
 
@@ -88,13 +89,16 @@ function InviteForm({
     formState: { errors, isSubmitting },
   } = useForm<InviteValues>({
     resolver: zodResolver(inviteSchema),
-    defaultValues: { email: '', canEditDossiers: false },
+    defaultValues: { email: '', canEditDossiers: false, canApproveDossiers: false },
   });
 
   const onValid = async (values: InviteValues) => {
     setError(null);
     try {
-      await inviteAffiliate(workspaceId, values.email.toLowerCase(), values.canEditDossiers);
+      await inviteAffiliate(workspaceId, values.email.toLowerCase(), {
+        canEditDossiers: values.canEditDossiers,
+        canApproveDossiers: values.canApproveDossiers,
+      });
       reset();
       showToast('Invitation sent');
       onInvited();
@@ -138,6 +142,10 @@ function InviteForm({
         <Checkbox
           label="Allow this Affiliate to edit dossiers"
           {...register('canEditDossiers', { disabled: blocked })}
+        />
+        <Checkbox
+          label="Allow this Affiliate to approve dossiers"
+          {...register('canApproveDossiers', { disabled: blocked })}
         />
         {blockedReason && (
           <p
@@ -254,7 +262,7 @@ export function MembersPage() {
     <PageHeader
       eyebrow="Workspace members"
       title={workspace?.name ?? 'Workspace members'}
-      description="Invite Affiliates, decide who may edit dossiers, and remove access. Only a platform administrator can change who the Principal is."
+      description="Invite Affiliates, decide who may edit and approve dossiers, and remove access. Only a platform administrator can change who the Principal is."
     />
   );
 
@@ -341,11 +349,24 @@ export function MembersPage() {
                               void run(
                                 `edit:${member.userId}`,
                                 () =>
-                                  setMemberDossierEdit(
-                                    workspaceId,
-                                    member.userId,
-                                    e.target.checked,
-                                  ),
+                                  setMemberDossierGrants(workspaceId, member.userId, {
+                                    canEditDossiers: e.target.checked,
+                                  }),
+                                'Permission updated',
+                              )
+                            }
+                          />
+                          <Checkbox
+                            label="Can approve dossiers"
+                            checked={member.canApproveDossiers}
+                            disabled={pending !== null}
+                            onChange={(e) =>
+                              void run(
+                                `approve:${member.userId}`,
+                                () =>
+                                  setMemberDossierGrants(workspaceId, member.userId, {
+                                    canApproveDossiers: e.target.checked,
+                                  }),
                                 'Permission updated',
                               )
                             }
@@ -382,7 +403,8 @@ export function MembersPage() {
                         <div className="truncate font-semibold text-navy">{invitation.email}</div>
                         <div className="text-xs text-muted">
                           {ROLE_LABELS[invitation.role]}
-                          {invitation.canEditDossiers ? ' · may edit dossiers' : ''} · expires{' '}
+                          {invitation.canEditDossiers ? ' · may edit dossiers' : ''}
+                          {invitation.canApproveDossiers ? ' · may approve dossiers' : ''} · expires{' '}
                           {formatDate(invitation.expiresAt.slice(0, 10))}
                         </div>
                       </div>

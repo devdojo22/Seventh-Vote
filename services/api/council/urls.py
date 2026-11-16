@@ -3,6 +3,8 @@ from django.urls import path
 from council import views
 
 urlpatterns = [
+    # M4/01: council as the simulator reads it
+    path("council", views.CouncilView.as_view(), name="council"),
     path("dossiers", views.DossierListCreateView.as_view(), name="dossier-list"),
     path("dossiers/<str:ref>", views.DossierDetailView.as_view(), name="dossier-detail"),
     path("dossiers/<str:ref>/restore", views.DossierRestoreView.as_view(), name="dossier-restore"),

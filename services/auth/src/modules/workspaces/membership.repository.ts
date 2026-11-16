@@ -10,8 +10,9 @@ import {
 import { assertSeatCanBeOccupied } from './affiliate-seats.js';
 import { lockWorkspace } from './workspace.repository.js';
 
-/** The part of a membership that scopes a session: which workspace, with which role. */
 export type MembershipScope = Pick<Membership, 'workspaceId' | 'role'>;
+
+export type DossierGrants = Partial<Pick<Membership, 'canEditDossiers' | 'canApproveDossiers'>>;
 
 export type MembershipWithUser = Membership & { user: User };
 export type MembershipWithWorkspace = Membership & { workspace: Workspace };
@@ -23,6 +24,7 @@ export interface GrantedMembership {
   workspaceId: string;
   role: Role;
   canEditDossiers: boolean;
+  canApproveDossiers: boolean;
   previousPrincipal: PreviousPrincipalOutcome;
   now: Date;
 }
@@ -54,19 +56,22 @@ async function revokeWorkspaceSessions(
 
 
 export async function grantMembership(tx: Prisma.TransactionClient, grant: GrantedMembership): Promise<PrincipalChange> {
-  const { userId, workspaceId, role, canEditDossiers, previousPrincipal, now } = grant;
+  const { userId, workspaceId, role, canEditDossiers, canApproveDossiers, previousPrincipal, now } = grant;
   const existing = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
   if (role === Role.AFFILIATE) {
     await assertSeatCanBeOccupied(tx, workspaceId, existing ? 0 : 1);
     await tx.membership.upsert({
       where: { userId_workspaceId: { userId, workspaceId } },
       update: {},
-      create: { userId, workspaceId, role, canEditDossiers },
+      create: { userId, workspaceId, role, canEditDossiers, canApproveDossiers },
     });
-    if (canEditDossiers) {
+    if (canEditDossiers || canApproveDossiers) {
       await tx.membership.updateMany({
         where: { userId, workspaceId, role: Role.AFFILIATE },
-        data: { canEditDossiers: true },
+        data: {
+          ...(canEditDossiers ? { canEditDossiers: true } : {}),
+          ...(canApproveDossiers ? { canApproveDossiers: true } : {}),
+        },
       });
     }
     return { previousPrincipalId: null, previousPrincipalOutcome: null };
@@ -86,7 +91,7 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
     if (previousPrincipal === PreviousPrincipalOutcome.KEEP_AS_AFFILIATE) {
       await tx.membership.update({
         where: { id: previous.id },
-        data: { role: Role.AFFILIATE, canEditDossiers: false },
+        data: { role: Role.AFFILIATE, canEditDossiers: false, canApproveDossiers: false },
       });
     } else {
       await tx.membership.delete({ where: { id: previous.id } });
@@ -117,7 +122,7 @@ export interface MembershipRepository {
     previousPrincipal: PreviousPrincipalOutcome,
     now: Date,
   ): Promise<TransferResult>;
-  setAffiliateDossierEdit(userId: string, workspaceId: string, canEditDossiers: boolean): Promise<MembershipWithUser | null>;
+  setAffiliateDossierGrants(userId: string, workspaceId: string, grants: DossierGrants): Promise<MembershipWithUser | null>;
   removeAffiliate(userId: string, workspaceId: string, now: Date): Promise<boolean>;
 }
 
@@ -175,6 +180,7 @@ export class PrismaMembershipRepository implements MembershipRepository {
         workspaceId,
         role: Role.PRINCIPAL,
         canEditDossiers: false,
+        canApproveDossiers: false,
         previousPrincipal,
         now,
       });
@@ -182,14 +188,14 @@ export class PrismaMembershipRepository implements MembershipRepository {
     });
   }
 
-  async setAffiliateDossierEdit(
+  async setAffiliateDossierGrants(
     userId: string,
     workspaceId: string,
-    canEditDossiers: boolean,
+    grants: DossierGrants,
   ): Promise<MembershipWithUser | null> {
     const { count } = await this.prisma.membership.updateMany({
       where: { userId, workspaceId, role: Role.AFFILIATE },
-      data: { canEditDossiers },
+      data: grants,
     });
     return count === 1 ? this.findWithUser(userId, workspaceId) : null;
   }

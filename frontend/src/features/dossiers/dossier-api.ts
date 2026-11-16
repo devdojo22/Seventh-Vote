@@ -8,6 +8,7 @@ import {
   RECORD_OUTCOMES,
   RECORD_TYPES,
   REVIEW_STATUSES,
+  SIMULATION_BASES,
   STANCE_LABELS,
   type ReviewStatus,
 } from '@/types/dossier';
@@ -85,6 +86,8 @@ const versionSchema = contentSchema.extend({
   changeNote: z.string(),
   createdBy: z.guid(),
   createdAt: timestamp,
+  /** Who submitted the version while it is in review (only they may withdraw it); null otherwise. */
+  submittedBy: z.guid().nullable(),
 });
 export type DossierVersion = z.infer<typeof versionSchema>;
 
@@ -114,8 +117,24 @@ const detailSchema = z.object({
   id: z.guid(),
   member: memberSchema,
   currentVersion: versionSchema,
+  /** The version the simulator reads (the API's council/simulation_version.py), which may be older than
+   * currentVersion: the latest approved one, or the current one ("unreviewed") while none is approved. */
+  simulationVersion: z.object({
+    versionNo: z.number().int().positive(),
+    basis: z.enum(SIMULATION_BASES),
+  }),
 });
 export type DossierDetail = z.infer<typeof detailSchema>;
+
+// M4/01: GET /api/council response schema.
+/** A council member with the version the simulator reads (see SIMULATION_BASES). */
+const councilMemberSchema = z.object({
+  id: z.guid(),
+  member: memberSchema,
+  basis: z.enum(SIMULATION_BASES),
+  version: versionSchema,
+});
+export type CouncilMemberDetail = z.infer<typeof councilMemberSchema>;
 
 const versionSummarySchema = z.object({
   versionNo: z.number().int().positive(),
@@ -134,6 +153,8 @@ const reviewChangeSchema = z.object({
   toStatus: z.enum(REVIEW_STATUSES),
   changedBy: z.guid(),
   changedAt: timestamp,
+  note: z.string(),
+  selfApproved: z.boolean(),
 });
 export type ReviewChange = z.infer<typeof reviewChangeSchema>;
 
@@ -183,6 +204,14 @@ export function listDossiers({ archived = false } = {}): Promise<DossierSummary[
       bearer,
       schema: z.array(summarySchema),
     }),
+  );
+}
+
+// M4/01: load the council from /api/council.
+/** The workspace's active members, each with the version the simulator reads (not the newest draft). */
+export function getCouncil(): Promise<CouncilMemberDetail[]> {
+  return withAccessToken((bearer) =>
+    apiRequest('/api/council', { method: 'GET', bearer, schema: z.array(councilMemberSchema) }),
   );
 }
 
@@ -262,18 +291,22 @@ export function getVersion(id: string, versionNo: number): Promise<DossierVersio
   );
 }
 
+/** `note` is required by the API when an approver sends a version back to draft. */
 export function setReviewStatus(
   id: string,
   status: ReviewStatus,
   versionNo: number,
+  note = '',
 ): Promise<ReviewChange> {
-  return withAccessToken((bearer) =>
-    apiRequest(`${dossierPath(id)}/review`, {
-      method: 'POST',
-      bearer,
-      body: { status, versionNo },
-      schema: reviewChangeSchema,
-    }),
+  return changesCouncil(
+    withAccessToken((bearer) =>
+      apiRequest(`${dossierPath(id)}/review`, {
+        method: 'POST',
+        bearer,
+        body: { status, versionNo, note },
+        schema: reviewChangeSchema,
+      }),
+    ),
   );
 }
 

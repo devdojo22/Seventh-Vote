@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SIMULATION_BASES } from './dossier'; // M4/01
 
 const source = { source_name: z.string(), source_url: z.string() };
 
@@ -58,6 +59,8 @@ export const memberSchema = z.object({
   mayor_alignment: z.union([z.string(), mayorAlignmentSchema]),
   political_style: z.union([z.string(), politicalStyleSchema]),
   twin_voice: z.union([z.string(), twinVoiceSchema]),
+  basis: z.enum(SIMULATION_BASES),
+  version_no: z.number().int().positive(),
 });
 
 export type Member = z.infer<typeof memberSchema>;

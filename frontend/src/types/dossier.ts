@@ -4,11 +4,12 @@
 export const REVIEW_STATUSES = ['draft', 'in_review', 'approved'] as const;
 export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
-/** What an entry in a dossier's archive history records. */
+export const SIMULATION_BASES = ['approved', 'unreviewed'] as const;
+export type SimulationBasis = (typeof SIMULATION_BASES)[number];
+
 export const ARCHIVE_ACTIONS = ['archived', 'restored'] as const;
 export type ArchiveAction = (typeof ARCHIVE_ACTIONS)[number];
 
-/** Nullable on an issue position until the client confirms the label set. */
 export const STANCE_LABELS = [
   'support',
   'lean_support',
@@ -34,10 +35,7 @@ export type RecordOutcome = (typeof RECORD_OUTCOMES)[number];
 export const DATE_PRECISIONS = ['day', 'month', 'year', 'unknown'] as const;
 export type DatePrecision = (typeof DATE_PRECISIONS)[number];
 
-/**
- * Input size limits of the dossier API (services/api/council/serializers.py and the model column lengths).
- * Mirrors the backend so the form flags oversize input before saving: change both together.
- */
+
 export const DOSSIER_LIMITS = {
   name: 200,
   initials: 10,

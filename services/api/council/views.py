@@ -8,9 +8,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.permissions import HasWorkspacePermission
-from council import review, services
+
+from council import review, services, simulation_version  # M4/01: simulation_version
 from council.models import Dossier, DossierArchiveEvent, DossierVersion, ReviewStatusChange
 from council.serializers import (
+    CouncilMemberSerializer,  # M4/01
     DossierArchiveEventSerializer,
     DossierCreateSerializer,
     DossierDetailSerializer,
@@ -25,6 +27,7 @@ from council.serializers import (
 
 CanViewDossiers = HasWorkspacePermission.of("viewDossiers")
 CanEditDossiers = HasWorkspacePermission.of("editDossiers")
+CanReviewDossiers = HasWorkspacePermission.any_of("editDossiers", "approveDossiers")
 
 
 def dossier_lookup(ref: str) -> Q:
@@ -187,18 +190,27 @@ class DossierVersionDetailView(WorkspaceDossierMixin, generics.RetrieveAPIView):
 
 
 class DossierReviewView(WorkspaceDossierMixin, generics.CreateAPIView):
-    """POST /api/dossiers/{id}/review {"status", "versionNo"}: change the review status of the version the
-    reviewer looked at. 409 version_conflict if that is no longer the current version. Returns the logged
-    change."""
+    """POST /api/dossiers/{id}/review {"status", "versionNo", "note"?}: change the review status of the version
+    the reviewer looked at. Needs editDossiers or approveDossiers; which transitions each allows is decided by
+    council.review (409 status_not_allowed otherwise). 409 version_conflict if that is no longer the current
+    version. Returns the logged change."""
 
     serializer_class = ReviewChangeRequestSerializer
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return super().get_permissions()
+        return [CanReviewDossiers()]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         version = self.get_version(serializer.validated_data["versionNo"])
         change = review.change_status(
-            version=version, to_status=serializer.validated_data["status"], principal=request.user
+            version=version,
+            to_status=serializer.validated_data["status"],
+            principal=request.user,
+            note=serializer.validated_data["note"],
         )
         return Response(ReviewStatusChangeSerializer(change).data, status=status.HTTP_201_CREATED)
 
@@ -221,3 +233,19 @@ class DossierEvidenceView(WorkspaceDossierMixin, generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         return Response(version_evidence(self.get_version(self.version_no_from_query())))
+
+
+# M4/01: GET /api/council
+# --- Council: what the simulator reads -------------------------------------------------------------------
+
+
+class CouncilView(generics.ListAPIView):
+    """GET /api/council: every active member of the caller's workspace with the dossier version the simulator
+    reads (see council.simulation_version), not the newest one. /api/dossiers stays the editing view."""
+
+    permission_classes = [CanViewDossiers]
+    serializer_class = CouncilMemberSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return simulation_version.council_versions(self.request.user.workspace_id)

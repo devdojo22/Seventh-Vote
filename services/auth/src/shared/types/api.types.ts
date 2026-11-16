@@ -45,6 +45,7 @@ export interface WorkspacePermissions {
   configureWorkspace: boolean;
   viewDossiers: boolean;
   editDossiers: boolean;
+  approveDossiers: boolean;
   runRehearsals: boolean;
   viewResults: boolean;
 }
@@ -55,6 +56,7 @@ export interface MemberResponse {
   name: string | null;
   role: Role;
   canEditDossiers: boolean;
+  canApproveDossiers: boolean;
   joinedAt: string;
 }
 
@@ -63,6 +65,7 @@ export interface InvitationResponse {
   email: string;
   role: Role;
   canEditDossiers: boolean;
+  canApproveDossiers: boolean;
   expiresAt: string;
   createdAt: string;
 }
@@ -143,5 +146,6 @@ export interface MeResponse extends AccessResponse {
   emailVerifiedAt: string | null;
   createdAt: string;
   canEditDossiers: boolean;
+  canApproveDossiers: boolean;
   workspaces: WorkspaceSummary[];
 }

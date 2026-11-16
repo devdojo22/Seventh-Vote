@@ -46,6 +46,7 @@ export class WorkspaceAccessService {
       kind: 'member',
       role: membership.role,
       canEditDossiers: membership.canEditDossiers,
+      canApproveDossiers: membership.canApproveDossiers,
     };
     return { workspaceId, grant, permissions: permissionsFor(grant), crossWorkspace: false };
   }

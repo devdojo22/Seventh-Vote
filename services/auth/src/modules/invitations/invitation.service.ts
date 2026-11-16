@@ -40,6 +40,7 @@ export interface NewInvitationRequest {
   email: string;
   role: Role;
   canEditDossiers: boolean;
+  canApproveDossiers: boolean;
   /** PRINCIPAL invitations only: applied to the current Principal when the invitation is accepted. */
   previousPrincipalOutcome: PreviousPrincipalOutcome | null;
   invitedById: string;
@@ -66,6 +67,7 @@ export function toInvitationResponse(invitation: Invitation): InvitationResponse
     email: invitation.email,
     role: invitation.role,
     canEditDossiers: invitation.canEditDossiers,
+    canApproveDossiers: invitation.canApproveDossiers,
     expiresAt: invitation.expiresAt.toISOString(),
     createdAt: invitation.createdAt.toISOString(),
   };
@@ -75,7 +77,8 @@ export function toInvitationResponse(invitation: Invitation): InvitationResponse
 export class InvitationService {
   constructor(private readonly deps: InvitationServiceDependencies) {}
   async invite(request: NewInvitationRequest, context: RequestContext): Promise<InvitationResponse> {
-    const { workspace, email, role, canEditDossiers, previousPrincipalOutcome, invitedById } = request;
+    const { workspace, email, role, canEditDossiers, canApproveDossiers, previousPrincipalOutcome, invitedById } =
+      request;
     if (workspace.archivedAt !== null) throw new HttpError(409, WORKSPACE_ARCHIVED);
     if ((await this.deps.users.findByEmail(email))?.isSuperAdmin) {
       throw new HttpError(409, SUPER_ADMIN_NO_WORKSPACE_ROLE);
@@ -87,6 +90,7 @@ export class InvitationService {
       email,
       role,
       canEditDossiers,
+      canApproveDossiers,
       previousPrincipalOutcome: role === Role.PRINCIPAL ? previousPrincipalOutcome : null,
       tokenHash: sha256(token),
       invitedById,
@@ -145,7 +149,7 @@ export class InvitationService {
       action: 'invitation.created',
       userId: invitedById,
       workspaceId: workspace.id,
-      meta: { invitationId: invitation.id, role, canEditDossiers },
+      meta: { invitationId: invitation.id, role, canEditDossiers, canApproveDossiers },
     });
     return toInvitationResponse(invitation);
   }

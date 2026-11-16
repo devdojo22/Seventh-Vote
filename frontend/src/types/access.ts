@@ -11,6 +11,7 @@ export interface WorkspacePermissions {
   configureWorkspace: boolean;
   viewDossiers: boolean;
   editDossiers: boolean;
+  approveDossiers: boolean;
   runRehearsals: boolean;
   viewResults: boolean;
 }

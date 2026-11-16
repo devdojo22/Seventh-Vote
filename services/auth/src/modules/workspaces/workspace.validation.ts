@@ -23,15 +23,22 @@ export const designatePrincipalSchema = z.object({
   previousPrincipal: z.nativeEnum(PreviousPrincipalOutcome).default(PreviousPrincipalOutcome.REMOVE),
 });
 
-/** The workspace's slug, typed by the super-admin to confirm a permanent deletion. */
 export const deleteWorkspaceSchema = z.object({ confirmSlug: z.string().trim().min(1).max(60) }).strict();
 
 export const inviteAffiliateSchema = z.object({
   email: emailSchema,
   canEditDossiers: z.boolean().default(false),
+  canApproveDossiers: z.boolean().default(false),
 });
 
-export const updateMemberSchema = z.object({ canEditDossiers: z.boolean() });
+export const updateMemberSchema = z
+  .object({ canEditDossiers: z.boolean().optional(), canApproveDossiers: z.boolean().optional() })
+  .strict()
+  .refine((body) => body.canEditDossiers !== undefined || body.canApproveDossiers !== undefined, {
+    message: 'Send canEditDossiers or canApproveDossiers',
+  });
+
+export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 
 
 export const voteRulesSchema = z

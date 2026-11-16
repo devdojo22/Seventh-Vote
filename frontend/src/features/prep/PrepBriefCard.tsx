@@ -51,6 +51,13 @@ export function PrepBriefCard({ brief }: { brief: PrepBrief }) {
         </div>
       </div>
 
+      {member.basis === 'unreviewed' && (
+        <Callout title="Based on an unreviewed draft">
+          No version of {member.name}&rsquo;s dossier has been approved yet, so this brief uses version{' '}
+          {member.version_no}, which nobody has reviewed.
+        </Callout>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <BriefCard
           title="How to frame the pitch"

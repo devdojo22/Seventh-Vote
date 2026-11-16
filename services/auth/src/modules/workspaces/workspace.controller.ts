@@ -125,13 +125,16 @@ export function createWorkspaceController(workspaces: WorkspaceService): Workspa
     },
 
     updateMember: async (req: Request, res: Response) => {
-      const { canEditDossiers } = parseBody(updateMemberSchema, req.body);
+      const { canEditDossiers, canApproveDossiers } = parseBody(updateMemberSchema, req.body);
       res.json(
-        await workspaces.setDossierEdit(
+        await workspaces.setDossierGrants(
           accessClaims(req).sub,
           workspaceAccess(req).workspaceId,
           idParam(req, 'userId'),
-          canEditDossiers,
+          {
+            ...(canEditDossiers === undefined ? {} : { canEditDossiers }),
+            ...(canApproveDossiers === undefined ? {} : { canApproveDossiers }),
+          },
           requestContext(req),
         ),
       );

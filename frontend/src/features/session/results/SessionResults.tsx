@@ -7,6 +7,7 @@ import { DownloadIcon } from '@/components/ui/icons';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { CATEGORY_LABELS } from '@/data/agenda';
 import { downloadText } from '@/lib/download';
+import { UNREVIEWED_EXPLANATION, unreviewedSummary } from '@/lib/members'; // M4/01
 import { citations } from '@/lib/simulation/scoring';
 import { textBrief } from '@/lib/simulation/text-brief';
 import { useCouncilStore } from '@/stores/council-store';
@@ -45,6 +46,7 @@ export function SessionResults({
   const oneShot = useCouncilStore((s) => s.config.procedure.oneShotStakes);
   const { rows, rule, voting, notVoting, threshold, outcome, blocRow } = analysis;
   const isConsent = outcome === 'consent';
+  const unreviewed = unreviewedSummary(rows.map((r) => r.member)); // M4/01
 
   return (
     <div className="space-y-8">
@@ -74,6 +76,8 @@ export function SessionResults({
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <Callout title={threshold.note}>{thresholdExplanation(analysis)}</Callout>
           {oneShot && <Callout title={oneShot.title}>{oneShot.body}</Callout>}
+          {/* M4/01: unreviewed members notice */}
+          {unreviewed && <Callout title={unreviewed}>{UNREVIEWED_EXPLANATION}</Callout>}
         </div>
       </div>
 

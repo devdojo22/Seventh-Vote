@@ -4,6 +4,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { BulletList } from '@/components/ui/BulletList';
 import { ChevronDownIcon } from '@/components/ui/icons';
+import { UnreviewedBadge } from '@/features/dossiers/DossierBadges'; // M4/01
 import { questions } from '@/lib/simulation/scoring';
 import type { MemberRow, SessionInput } from '@/types/simulation';
 import { EvidenceTrace } from './EvidenceTrace';
@@ -68,6 +69,8 @@ export function MemberReadCard({ row, input }: { row: MemberRow; input: SessionI
             >
               {participationLabel(row)}
             </Badge>
+            {/* M4/01 */}
+            {row.member.basis === 'unreviewed' && <UnreviewedBadge />}
           </span>
 
           <span className="col-span-2 line-clamp-2 text-xs font-normal text-muted italic lg:col-span-1 lg:line-clamp-1">

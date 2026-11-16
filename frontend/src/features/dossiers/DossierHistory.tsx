@@ -4,7 +4,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Loader } from '@/components/ui/Loader';
 import { ARCHIVE_ACTION_LABELS } from '@/data/dossier-options';
 import { listArchiveHistory, listReviewHistory, listVersions } from './dossier-api';
-import { ReviewStatusBadge, VersionBadge } from './DossierBadges';
+import { ReviewStatusBadge, SelfApprovedBadge, VersionBadge } from './DossierBadges';
 import { formatDateTime } from './dossier-format';
 import { LoadError } from './DossierStates';
 import { SMALL_BUTTON_CLASS } from './link-classes';
@@ -139,7 +139,13 @@ export function ReviewHistory({ dossierId }: { dossierId: string }) {
               <span className="sr-only">changed to</span>
               <ReviewStatusBadge status={e.toStatus} />
               <span>on version {e.versionNo}</span>
+              {e.selfApproved && <SelfApprovedBadge />}
             </div>
+            {e.note && (
+              <p className="text-[13px] leading-relaxed whitespace-pre-line text-ink/80">
+                {e.note}
+              </p>
+            )}
             <p className="text-[11px] font-medium text-muted">
               {formatDateTime(e.changedAt)} · {authorName(e.changedBy)}
             </p>
