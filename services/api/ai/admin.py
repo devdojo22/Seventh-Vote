@@ -1,9 +1,5 @@
-# M4/03: see the dossier embeddings in Django admin (read-only; the 384 numbers are hidden).
-
 from django.contrib import admin
-
 from ai.models import DossierEmbedding
-
 
 @admin.register(DossierEmbedding)
 class DossierEmbeddingAdmin(admin.ModelAdmin):

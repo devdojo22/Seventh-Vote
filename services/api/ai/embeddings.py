@@ -1,32 +1,21 @@
-# M4/03: makes embeddings of dossier data and saves them in the dossier_embeddings table.
-#
-# Model: BAAI/bge-small-en-v1.5 through fastembed. It runs inside the API container on the CPU: no API key,
-# no account. The model is downloaded into the Docker image at build time (see Dockerfile), into /models.
-#
-# Use:
-#     embedder = DossierEmbedder()
-#     embedder.embed_version(version)       # cut one dossier version into pieces, embed them, save them
-#     embedder.embed_all_members()          # the same for every member (the version the simulator reads)
-#     embedder.embed_question("pitch...")   # a pitch -> an embedding, to search with later
-
+import logging
 from django.db import transaction
 from fastembed import TextEmbedding
-
 from ai.models import DossierEmbedding
 from council.models import Dossier
 from council.simulation_version import simulation_version
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
+logger = logging.getLogger(__name__)
+
 
 class DossierEmbedder:
-    model = None  # loaded once, then shared by every DossierEmbedder
+    model = None
 
     def __init__(self):
         if DossierEmbedder.model is None:
             DossierEmbedder.model = TextEmbedding(MODEL_NAME, cache_dir="/models")
-
-    # ---------- 1. text -> embedding ----------
 
     def embed_texts(self, texts):
         """Dossier pieces -> one embedding (384 numbers) each."""
@@ -35,8 +24,6 @@ class DossierEmbedder:
     def embed_question(self, text):
         """A pitch or question -> one embedding, to compare with the dossier pieces."""
         return next(iter(self.model.query_embed(text))).tolist()
-
-    # ---------- 2. dossier version -> pieces ----------
 
     def make_pieces(self, version):
         """Cuts a dossier version into small pieces: one per vote, quote, position, plus the profile texts.
@@ -75,8 +62,6 @@ class DossierEmbedder:
 
         return pieces
 
-    # ---------- 3. pieces -> embeddings -> database ----------
-
     @transaction.atomic
     def embed_version(self, version):
         """Makes the pieces of one version, embeds them and saves them. Old rows of this version are
@@ -99,7 +84,21 @@ class DossierEmbedder:
 
     def embed_all_members(self):
         """Embeds, for every member, the version the simulator reads (latest approved, else current)."""
-        for dossier in Dossier.objects.select_related("member"):
+        for dossier in Dossier.objects.select_related("member").filter(member__archived_at__isnull=True): 
             version = simulation_version(dossier).version
             count = self.embed_version(version)
             print(f"{version.name} v{version.version_no}: {count} pieces")
+
+
+def embed_after_approve(version):
+    """Called when a dossier version is approved: embeds it once the approval is saved.
+    If embedding fails, the approval still stands; the error is logged, and the version gets embedded
+    the first time it is searched (see ai.retrieval.find_evidence)."""
+
+    def run():
+        try:
+            DossierEmbedder().embed_version(version)
+        except Exception:
+            logger.exception("Embedding dossier version %s failed", version.pk)
+
+    transaction.on_commit(run)
