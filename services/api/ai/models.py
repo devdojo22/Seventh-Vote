@@ -1,10 +1,6 @@
-# M4/03: embeddings of dossier data, used to find the evidence that matches a pitch.
-
 import uuid
-
 from django.db import models
 from pgvector.django import VectorField
-
 from council.models import DossierVersion, Member
 
 
