@@ -1,6 +1,5 @@
 from django.urls import path
 
-from ai.views import EvidenceSearchView  # M4/03
 from council import views
 
 urlpatterns = [
@@ -23,5 +22,4 @@ urlpatterns = [
     path("dossiers/<str:ref>/review", views.DossierReviewView.as_view(), name="dossier-review"),
     path("dossiers/<str:ref>/review-history", views.DossierReviewHistoryView.as_view(), name="dossier-review-history"),
     path("dossiers/<str:ref>/evidence", views.DossierEvidenceView.as_view(), name="dossier-evidence"),
-    path("dossiers/<str:ref>/evidence-search", EvidenceSearchView.as_view(), name="dossier-evidence-search"),
 ]
