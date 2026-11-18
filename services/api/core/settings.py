@@ -19,7 +19,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "council",
     "simulation",
-    "ai",  # M4/03
 ]
 
 MIDDLEWARE = [
