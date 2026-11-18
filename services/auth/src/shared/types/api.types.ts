@@ -136,6 +136,7 @@ export interface AccessResponse {
   activeWorkspaceId: string | null;
   role: Role | null;
   permissions: WorkspacePermissions | null;
+  voteRules: VoteRules | null;
 }
 
 export interface MeResponse extends AccessResponse {
