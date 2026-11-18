@@ -110,10 +110,9 @@ export async function grantMembership(tx: Prisma.TransactionClient, grant: Grant
 
 export interface MembershipRepository {
   find(userId: string, workspaceId: string): Promise<Membership | null>;
-  /** The membership only while its workspace is not archived: the lookup every access decision uses. */
   findActive(userId: string, workspaceId: string): Promise<Membership | null>;
+  findActiveWithWorkspace(userId: string, workspaceId: string): Promise<MembershipWithWorkspace | null>;
   findWithUser(userId: string, workspaceId: string): Promise<MembershipWithUser | null>;
-  /** The user's memberships in workspaces that are not archived. */
   listActiveForUser(userId: string): Promise<MembershipWithWorkspace[]>;
   listForWorkspace(workspaceId: string): Promise<MembershipWithUser[]>;
   transferPrincipal(
@@ -135,6 +134,13 @@ export class PrismaMembershipRepository implements MembershipRepository {
 
   findActive(userId: string, workspaceId: string): Promise<Membership | null> {
     return this.prisma.membership.findFirst({ where: { userId, workspaceId, ...IN_ACTIVE_WORKSPACE } });
+  }
+
+  findActiveWithWorkspace(userId: string, workspaceId: string): Promise<MembershipWithWorkspace | null> {
+    return this.prisma.membership.findFirst({
+      where: { userId, workspaceId, ...IN_ACTIVE_WORKSPACE },
+      include: { workspace: true },
+    });
   }
 
   findWithUser(userId: string, workspaceId: string): Promise<MembershipWithUser | null> {
@@ -160,7 +166,6 @@ export class PrismaMembershipRepository implements MembershipRepository {
     });
   }
 
-  /** Promotes an existing member. State is re-read under the workspace lock, so concurrent transfers serialize. */
   transferPrincipal(
     userId: string,
     workspaceId: string,
@@ -170,7 +175,6 @@ export class PrismaMembershipRepository implements MembershipRepository {
     return this.prisma.$transaction(async (tx): Promise<TransferResult> => {
       await lockWorkspace(tx, workspaceId);
       const workspace = await tx.workspace.findUnique({ where: { id: workspaceId } });
-      // Missing (undefined) or archived (a date): only an active workspace has archivedAt === null.
       if (workspace?.archivedAt !== null) return { status: 'workspace-unavailable' };
       const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
       if (!membership) return { status: 'not-member' };
