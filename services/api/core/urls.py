@@ -9,5 +9,5 @@ urlpatterns = [
     re_path(r"^api/static/(?P<path>.*)$", serve, {"insecure": True}),
     path("api/health", health),
     path("api/", include("council.urls")),
-    path("api/simulations/", include("simulation.urls")),
+    path("api/", include("simulation.urls")),
 ]

@@ -30,7 +30,22 @@ class AuthenticatedPrincipal:
     workspace_id: str | None
     role: str | None
     permissions: dict[str, bool] | None = field(default=None)
+    # M4/04: the workspace's vote rules {"bodySize", "majorityThreshold", "quorum"}; None until its Principal sets them.
+    vote_rules: dict[str, int] | None = field(default=None)
     is_authenticated = True
+
+
+VOTE_RULE_KEYS = ("bodySize", "majorityThreshold", "quorum")
+
+
+def _vote_rules(value) -> dict[str, int] | None:
+    """The vote rules from /auth/me/access, or None if they are not set or not the expected shape."""
+    if not isinstance(value, dict):
+        return None
+    rules = {key: value.get(key) for key in VOTE_RULE_KEYS}
+    if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 1 for n in rules.values()):
+        return None
+    return rules
 
 
 def _is_uuid(value) -> bool:
@@ -124,6 +139,7 @@ class AuthServiceJWTAuthentication(BaseAuthentication):
             workspace_id=workspace_id if workspace_id == claims.get("wid") else None,
             role=account.get("role") if workspace_id == claims.get("wid") else None,
             permissions=account.get("permissions") if workspace_id == claims.get("wid") else None,
+            vote_rules=_vote_rules(account.get("voteRules")) if workspace_id == claims.get("wid") else None,
         )
         return principal, claims
 
