@@ -5,4 +5,3 @@ pgvector>=0.3
 PyJWT>=2.8
 anthropic
 gunicorn>=23
-fastembed>=0.9,<0.10  # M4/03: local embedding model (ONNX, CPU)

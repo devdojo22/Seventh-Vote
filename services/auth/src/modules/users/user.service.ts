@@ -1,9 +1,8 @@
-import type { User } from '@prisma/client';
+import type { Membership, User } from '@prisma/client';
 import { HttpError } from '../../shared/errors/http-error.js';
 import type { AccessResponse, MeResponse } from '../../shared/types/api.types.js';
 import type { AccessTokenClaims } from '../tokens/token.types.js';
-import type { MembershipRepository, MembershipWithWorkspace } from '../workspaces/membership.repository.js';
-import { voteRulesOf } from '../workspaces/vote-rules.js';
+import type { MembershipRepository } from '../workspaces/membership.repository.js';
 import { permissionsFor } from '../workspaces/workspace-permissions.js';
 import type { UserRepository } from './user.repository.js';
 
@@ -12,7 +11,7 @@ export function displayName(user: Pick<User, 'firstName' | 'lastName' | 'name'>)
   return parts.length > 0 ? parts.join(' ') : user.name;
 }
 
-function accessIn(user: User, active: MembershipWithWorkspace | null): AccessResponse {
+function accessIn(user: User, active: Membership | null): AccessResponse {
   return {
     id: user.id,
     isSuperAdmin: user.isSuperAdmin,
@@ -31,7 +30,6 @@ function accessIn(user: User, active: MembershipWithWorkspace | null): AccessRes
                   canApproveDossiers: active.canApproveDossiers,
                 },
           ),
-    voteRules: active === null ? null : voteRulesOf(active.workspace),
   };
 }
 
@@ -51,8 +49,8 @@ export class UserService {
   }
 
   async getAccess(user: User, claims: AccessTokenClaims): Promise<AccessResponse> {
-    const active =
-      claims.wid === null ? null : await this.deps.memberships.findActiveWithWorkspace(user.id, claims.wid);
+    // Archived workspaces grant nothing, here or in the Django API, which relies on this answer.
+    const active = claims.wid === null ? null : await this.deps.memberships.findActive(user.id, claims.wid);
     return accessIn(user, active);
   }
 

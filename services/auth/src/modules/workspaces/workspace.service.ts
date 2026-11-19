@@ -22,7 +22,6 @@ import type {
   MembershipWithUser,
   TransferResult,
 } from './membership.repository.js';
-import { voteRulesOf } from './vote-rules.js';
 import { WORKSPACE_ARCHIVED } from './workspace-access.service.js';
 import type {
   CreateWorkspaceInput,
@@ -55,10 +54,14 @@ function toMemberResponse(membership: MembershipWithUser): MemberResponse {
 }
 
 function toSettingsResponse(workspace: Workspace, canConfigure: boolean): WorkspaceSettingsResponse {
+  const { voteBodySize, voteMajorityThreshold, voteQuorum } = workspace;
   return {
     workspaceId: workspace.id,
     name: workspace.name,
-    voteRules: voteRulesOf(workspace),
+    voteRules:
+      voteBodySize === null || voteMajorityThreshold === null || voteQuorum === null
+        ? null
+        : { bodySize: voteBodySize, majorityThreshold: voteMajorityThreshold, quorum: voteQuorum },
     canConfigure,
     updatedAt: workspace.updatedAt.toISOString(),
   };

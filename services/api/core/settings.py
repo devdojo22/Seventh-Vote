@@ -19,7 +19,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "council",
     "simulation",
-    "ai",  # M4/03
 ]
 
 MIDDLEWARE = [
@@ -81,4 +80,3 @@ AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth:4000").rstrip
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or None
 LLM_MODEL = os.environ.get("LLM_MODEL", "claude-opus-5-5")
-LLM_EFFORT = os.environ.get("LLM_EFFORT", "medium")  
