@@ -96,4 +96,9 @@ def change_status(*, version: DossierVersion, to_status: str, principal, note: s
     )
     locked.status = to_status
     locked.save(update_fields=["status"])
+
+    if to_status == ReviewStatus.APPROVED:
+        from ai.embeddings import embed_after_approve 
+
+        embed_after_approve(locked)
     return change
