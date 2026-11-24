@@ -1,4 +1,4 @@
-import { SourceList } from '@/components/SourceList';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Callout } from '@/components/ui/Callout';
@@ -6,12 +6,13 @@ import { Card } from '@/components/ui/Card';
 import { DownloadIcon } from '@/components/ui/icons';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { CATEGORY_LABELS } from '@/data/agenda';
-import { downloadText } from '@/lib/download';
+import { Spinner } from '@/features/auth/AuthControls';
 import { UNREVIEWED_EXPLANATION, unreviewedSummary } from '@/lib/members'; // M4/01
-import { citations } from '@/lib/simulation/scoring';
-import { textBrief } from '@/lib/simulation/text-brief';
+import { evidenceGapNote, thresholdExplanation } from '@/lib/simulation/session-summary';
+import { useAppStore } from '@/stores/app-store';
 import { useCouncilStore } from '@/stores/council-store';
 import type { SessionAnalysis, SessionInput } from '@/types/simulation';
+import { buildSessionReport } from '../report/session-report';
 import { ConsentPanel } from './ConsentPanel';
 import { MemberReadCard } from './MemberReadCard';
 import { OutreachList } from './OutreachList';
@@ -19,21 +20,30 @@ import { PivotalPanel } from './PivotalPanel';
 import { TallyPanel } from './TallyPanel';
 import { ThresholdFigure } from './ThresholdFigure';
 
-function thresholdExplanation(analysis: SessionAnalysis): string {
-  const { threshold, direction, target } = analysis;
-  const parts = [
-    threshold.verified
-      ? 'The threshold is recomputed from the selected action type and attendance.'
-      : `The ${threshold.needed}-vote ordinary-passage default is shown as an unverified working inference, not a confirmed Rules threshold.`,
-  ];
-  if (direction === 'oppose' && threshold.basis !== 'consent') {
-    const absent =
-      threshold.basis === 'full'
-        ? '; absent and recused members cannot vote yes, so they count toward the block'
-        : '';
-    parts.push(`To block, ${target} members must not vote yes${absent}.`);
-  }
-  return parts.join(' ');
+const NOTICE_GRID: Record<number, string> = {
+  1: '',
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-2 lg:grid-cols-3',
+};
+
+function useReportDownload(analysis: SessionAnalysis, input: SessionInput) {
+  const config = useCouncilStore((s) => s.config);
+  const showToast = useAppStore((s) => s.showToast);
+  const [preparing, setPreparing] = useState(false);
+
+  const download = async () => {
+    setPreparing(true);
+    try {
+      const report = buildSessionReport(analysis, input, config, new Date());
+      const { downloadSessionReport } = await import('../report/download-session-report');
+      await downloadSessionReport(report);
+    } catch {
+      showToast('The PDF couldn’t be created. Try again.');
+    } finally {
+      setPreparing(false);
+    }
+  };
+  return { preparing, download };
 }
 
 export function SessionResults({
@@ -44,25 +54,35 @@ export function SessionResults({
   input: SessionInput;
 }) {
   const oneShot = useCouncilStore((s) => s.config.procedure.oneShotStakes);
-  const { rows, rule, voting, notVoting, threshold, outcome, blocRow } = analysis;
+  const report = useReportDownload(analysis, input);
+  const { rows, rule, voting, notVoting, threshold, outcome } = analysis;
   const isConsent = outcome === 'consent';
   const unreviewed = unreviewedSummary(rows.map((r) => r.member)); // M4/01
+  const notices = [
+    { title: threshold.note, body: thresholdExplanation(analysis) },
+    ...(oneShot ? [oneShot] : []),
+    ...(unreviewed ? [{ title: unreviewed, body: UNREVIEWED_EXPLANATION }] : []),
+  ];
+  const gapNote = evidenceGapNote(analysis);
 
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <Card className="flex flex-col items-stretch justify-between gap-5 sm:flex-row sm:items-center">
-          <div className="min-w-0 space-y-2">
-            <small className="block text-xs font-bold tracking-[0.14em] text-gold uppercase">
+        <Card
+          padded={false}
+          className="flex flex-col items-stretch justify-between gap-6 p-5 sm:flex-row sm:items-center sm:p-8"
+        >
+          <div className="min-w-0 space-y-2.5">
+            <small className="block text-[11px] font-bold tracking-[0.16em] text-gold uppercase">
               Simulation result
             </small>
-            <h2 className="font-display text-xl leading-tight font-bold text-navy sm:text-2xl lg:text-[28px]">
+            <h2 className="font-display text-xl leading-tight font-bold text-navy sm:text-2xl lg:text-[30px]">
               {input.title}
             </h2>
             <p className="text-[13px] text-muted">
               {CATEGORY_LABELS[input.category]} · {rule.label} · {input.ask}
             </p>
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <div className="flex flex-wrap gap-2 pt-0.5">
               <Badge>Committee: {input.committee || 'Not entered'}</Badge>
               <Badge>Chair: {input.committeeChair || 'Chair not entered'}</Badge>
               <Badge>
@@ -73,13 +93,16 @@ export function SessionResults({
           <ThresholdFigure analysis={analysis} />
         </Card>
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <Callout title={threshold.note}>{thresholdExplanation(analysis)}</Callout>
-          {oneShot && <Callout title={oneShot.title}>{oneShot.body}</Callout>}
-          {/* M4/01: unreviewed members notice */}
-          {unreviewed && <Callout title={unreviewed}>{UNREVIEWED_EXPLANATION}</Callout>}
+        <div className={`grid grid-cols-1 gap-4 ${NOTICE_GRID[notices.length]}`}>
+          {notices.map((notice) => (
+            <Callout key={notice.title} title={notice.title}>
+              {notice.body}
+            </Callout>
+          ))}
         </div>
       </div>
+
+      {gapNote && <Callout title={gapNote.title}>{gapNote.body}</Callout>}
 
       {isConsent ? (
         <ConsentPanel objectors={analysis.consentObjectors} />
@@ -104,26 +127,21 @@ export function SessionResults({
         />
         <div className="space-y-2.5">
           {rows.map((row) => (
-            <MemberReadCard key={row.member.id} row={row} input={input} />
+            <MemberReadCard key={row.member.id} row={row} />
           ))}
         </div>
       </div>
 
       <OutreachList analysis={analysis} />
 
-      {blocRow && (
-        <div className="rounded-2xl border border-line bg-white p-5 text-[13px] leading-relaxed text-ink/80 shadow-card">
-          <strong className="font-semibold text-navy">Bloc dynamic to watch:</strong>{' '}
-          {blocRow.member.voting_bloc} <SourceList citations={citations(blocRow)} />
-        </div>
-      )}
-
       <Button
         variant="secondary"
-        onClick={() => downloadText('seventh-vote-brief.txt', textBrief(analysis, input))}
+        onClick={() => void report.download()}
+        disabled={report.preparing}
+        aria-busy={report.preparing}
       >
-        <DownloadIcon className="size-4" />
-        Download text brief
+        {report.preparing ? <Spinner /> : <DownloadIcon className="size-4" />}
+        {report.preparing ? 'Preparing PDF…' : 'Download PDF brief'}
       </Button>
     </div>
   );

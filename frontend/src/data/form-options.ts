@@ -1,9 +1,22 @@
-import type { AttendanceStatus, DistrictImpact, FiscalImpact, Priority } from '@/types/simulation';
+import { CATEGORY_LABELS } from '@/data/agenda';
+import type { Option } from '@/lib/options';
+import {
+  ASKS,
+  CATEGORY_IDS,
+  type Ask,
+  type AttendanceStatus,
+  type CategoryId,
+  type DistrictImpact,
+  type FiscalImpact,
+  type Priority,
+} from '@/types/simulation';
 
-interface Option<T extends string> {
-  value: T;
-  label: string;
-}
+export const CATEGORY_OPTIONS: Option<CategoryId>[] = CATEGORY_IDS.map((id) => ({
+  value: id,
+  label: CATEGORY_LABELS[id],
+}));
+
+export const ASK_OPTIONS: Option<Ask>[] = ASKS.map((ask) => ({ value: ask, label: ask }));
 
 export const FISCAL_OPTIONS: Option<FiscalImpact>[] = [
   { value: 'cost', label: 'Costs the city money' },

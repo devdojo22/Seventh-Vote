@@ -64,17 +64,57 @@ const designatePrincipalSchema = z.discriminatedUnion('status', [
 ]);
 export type DesignatePrincipalResult = z.infer<typeof designatePrincipalSchema>;
 
+export const RECUSAL_MODES = ['excluded', 'present'] as const;
+export type RecusalMode = (typeof RECUSAL_MODES)[number];
+export const TIE_BREAKS = ['fails', 'chair', 'passes'] as const;
+export type TieBreak = (typeof TIE_BREAKS)[number];
+
+export const FRACTION_BASES = ['seats', 'present'] as const;
+
+const voteThresholdSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('count'), needed: z.number().int() }),
+  z.object({
+    type: z.literal('fraction'),
+    numerator: z.number().int(),
+    denominator: z.number().int(),
+    of: z.enum(FRACTION_BASES),
+  }),
+  z.object({ type: z.literal('present_majority') }),
+  z.object({ type: z.literal('consent') }),
+]);
+export type VoteThreshold = z.infer<typeof voteThresholdSchema>;
+
+const actionVoteRuleSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  threshold: voteThresholdSchema,
+  note: z.string(),
+  verified: z.boolean(),
+});
+export type ActionVoteRule = z.infer<typeof actionVoteRuleSchema>;
+
 const voteRulesSchema = z.object({
   bodySize: z.number().int(),
   majorityThreshold: z.number().int(),
   quorum: z.number().int(),
+  actions: z.array(actionVoteRuleSchema),
+  recusal: z.enum(RECUSAL_MODES),
+  tieBreak: z.enum(TIE_BREAKS),
 });
 export type VoteRules = z.infer<typeof voteRulesSchema>;
+
+const savedVoteProcedureSchema = voteRulesSchema.pick({
+  actions: true,
+  recusal: true,
+  tieBreak: true,
+});
+export type SavedVoteProcedure = z.infer<typeof savedVoteProcedureSchema>;
 
 const workspaceSettingsSchema = z.object({
   workspaceId: z.guid(),
   name: z.string(),
   voteRules: voteRulesSchema.nullable(),
+  voteProcedure: savedVoteProcedureSchema,
   canConfigure: z.boolean(),
   updatedAt: z.iso.datetime({ offset: true }),
 });
@@ -93,7 +133,6 @@ export function getWorkspaceSettings(workspaceId: string): Promise<WorkspaceSett
   );
 }
 
-/** Saves the vote rules. The council's thresholds come from them, so a successful save refreshes it. */
 export async function updateVoteRules(
   workspaceId: string,
   voteRules: VoteRules,

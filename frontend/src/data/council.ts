@@ -1,5 +1,14 @@
 import type { CouncilConfig } from '@/types/council';
 
+export const MEMPHIS_SNAPSHOT_MEMBER_SLUGS: readonly string[] = [
+  'jb-smiley-jr',
+  'jana-swearengen-washington',
+  'jerri-green',
+  'michalyn-easter-thomas',
+  'rhonda-logan',
+  'edmund-ford-sr',
+  'janika-white',
+];
 
 export const councilConfig: Omit<CouncilConfig, 'seatCount'> = {
   councilName: 'Memphis City Council',

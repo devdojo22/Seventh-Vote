@@ -1,17 +1,23 @@
-import { SourceList } from '@/components/SourceList';
-import { citations } from '@/lib/simulation/scoring';
-import type { MemberRow } from '@/types/simulation';
+import { SourceLink } from '@/components/SourceLink';
+import type { SimulationCitation } from '@/features/simulation/simulation-api';
+import { citationSourceName } from '@/features/simulation/simulation-citations';
 
-export function EvidenceTrace({ row }: { row: MemberRow }) {
-  const cites = citations(row);
+export function EvidenceTrace({ citations }: { citations: readonly SimulationCitation[] }) {
   return (
-    <div className="rounded-xl border border-line2 bg-paper/70 px-3.5 py-2.5 text-xs leading-relaxed text-muted">
-      <strong className="font-semibold text-navy">Evidence trace · </strong>
-      {cites.length > 0 ? <SourceList citations={cites} /> : <span>No direct source found</span>}
-      <span className="text-muted/80">
-        {' '}
-        · Dossier fields: issue_positions, key_votes, opposition_triggers, persuasion_levers
-      </span>
+    <div className="rounded-xl bg-paper px-4 py-3.5 text-xs leading-relaxed text-muted sm:px-5">
+      <strong className="font-bold text-navy">Evidence trace</strong>
+      {citations.length > 0 ? (
+        citations.map((c) => (
+          <span key={c.label}>
+            {' · '}
+            <strong className="font-bold text-navy">{c.label}</strong>
+            {' · '}
+            <SourceLink name={citationSourceName(c)} url={c.sourceUrl} />
+          </span>
+        ))
+      ) : (
+        <span> · No dossier evidence was cited</span>
+      )}
     </div>
   );
 }

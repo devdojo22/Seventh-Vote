@@ -11,6 +11,8 @@ const API_ERROR_CODES = [
   'version_conflict',
   'dossier_archived',
   'status_unchanged',
+  'simulation_failed',
+  'llm_not_configured',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

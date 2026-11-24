@@ -4,52 +4,44 @@ import { BulletList } from '@/components/ui/BulletList';
 import { Callout } from '@/components/ui/Callout';
 import { Card } from '@/components/ui/Card';
 import { METHODOLOGY } from '@/data/methodology';
-import { rehearsalRules } from '@/data/rehearsal-rules';
 import { buildSourceCloud } from '@/lib/members';
 import { findRule } from '@/lib/simulation/thresholds';
 import { useCouncilStore } from '@/stores/council-store';
+import type { ActionRule } from '@/types/simulation';
 
 const PANEL_TITLE_CLASS = 'font-display text-xl font-bold text-navy';
 
 export function MethodologyPage() {
   const members = useCouncilStore((s) => s.members);
-  const membersById = useCouncilStore((s) => s.membersById);
   const rules = useCouncilStore((s) => s.rules);
   const snapshot = useCouncilStore((s) => s.snapshot);
   const { seatCount, rulesOfProcedure, research } = useCouncilStore((s) => s.config);
 
   const cloud = buildSourceCloud(members, rulesOfProcedure);
-  const needed = (id: 'censure' | 'rules_amendment' | 'ordinary') => {
-    const rule = findRule(rules, id);
-    return rule.basis === 'full' ? rule.needed : 0;
-  };
-  const noDirectVoice = rehearsalRules.noDirectVoiceMemberIds
-    .map((id) => membersById[id]?.name)
-    .filter(Boolean)
-    .join(' and ');
+  // The rules come from the workspace's saved vote rules, so describe whichever action types it has.
   const ordinary = findRule(rules, 'ordinary');
+  const ordinaryNeeded = ordinary.basis === 'full' ? ordinary.needed : 0;
+  const describe = (rule: ActionRule) => {
+    if (rule.basis === 'full') return `${rule.label} requires ${rule.needed} of ${seatCount}`;
+    if (rule.basis === 'present' && rule.fraction) {
+      return `${rule.label} needs ${rule.fraction.numerator}/${rule.fraction.denominator} of members present`;
+    }
+    return `${rule.label} uses a majority of members present`;
+  };
+  const others = rules.filter((r) => r.id !== 'ordinary' && r.basis !== 'consent');
 
-  const thresholdLimits = snapshot
-    ? [
-        `Rules-aware thresholds: censure requires ${needed('censure')} of ${seatCount}; Rules amendments require ${needed('rules_amendment')} of ${seatCount}; listed procedural motions use a majority of members present.`,
-        ordinary.verified
-          ? `Ordinary items need ${needed('ordinary')} of ${seatCount}, from this workspace’s vote rules.`
-          : `The ordinary ${needed('ordinary')}-vote default is an unverified working inference because ordinary passage is Charter-governed, not stated in the Rules.`,
-      ]
-    : [
-        `Ordinary items need ${needed('ordinary')} of ${seatCount}${ordinary.verified ? ', from this workspace’s vote rules' : ', a working inference until this workspace’s vote rules are set'}; procedural motions use a majority of members present.`,
-      ];
+  const thresholdLimits = [
+    snapshot && !ordinary.verified
+      ? `The ordinary ${ordinaryNeeded}-vote default is an unverified working inference because ordinary passage is Charter-governed, not stated in the Rules.`
+      : `Ordinary items need ${ordinaryNeeded} of ${seatCount}${ordinary.verified ? ', from this workspace’s vote rules' : ', a working inference until this workspace’s vote rules are set'}.`,
+    ...(others.length > 0 ? [`Rules-aware thresholds: ${others.map(describe).join('; ')}.`] : []),
+  ];
 
   const limits = [
     ...thresholdLimits,
     METHODOLOGY.consentLimit,
     ...METHODOLOGY.limits,
     ...research.sourceCaveats,
-    ...(noDirectVoice
-      ? [
-          `${noDirectVoice} receives no invented direct voice because no verified verbatim 2024–26 quotes were found.`,
-        ]
-      : []),
   ];
 
   return (

@@ -1,4 +1,3 @@
-import { rehearsalRules } from '@/data/rehearsal-rules';
 import { STANCES } from '@/data/stances';
 import { alignment, recordDepth } from '@/lib/members';
 import type {
@@ -6,6 +5,7 @@ import type {
   MemberRow,
   PivotalAnalysis,
   PivotalMode,
+  PresentMemberRow,
   TallySegment,
   Threshold,
 } from '@/types/simulation';
@@ -19,33 +19,29 @@ const MAYOR_POSTURE_FACTOR = { ally: 1.05, independent: 1, critic: 0.9 } as cons
 const OUTREACH_LIMIT = 3;
 
 /** Members counted in the projection; absent and recused members are excluded. */
-export function votingRows(rows: MemberRow[]): MemberRow[] {
-  return rows.filter((r) => r.participation === 'present');
+export function votingRows(rows: MemberRow[]): PresentMemberRow[] {
+  return rows.filter((r): r is PresentMemberRow => r.participation === 'present');
 }
 
-/** Score oriented toward the requested side: positive means leaning that way. */
 function goalScore(row: MemberRow, direction: Direction): number {
   return direction === 'oppose' ? -row.score : row.score;
 }
 
-/**
- * Votes already on the requested side. When blocking a full-membership vote,
- * absent and recused members cannot vote yes, so they count toward the block.
- */
+
 export function goalCount(rows: MemberRow[], direction: Direction, threshold: Threshold): number {
   const voting = votingRows(rows);
   const leaning = voting.filter((r) => goalScore(r, direction) > 0).length;
   const cannotVoteYes =
-    direction === 'oppose' && threshold.basis === 'full' ? rows.length - voting.length : 0;
+    direction !== 'oppose'
+      ? 0
+      : threshold.basis === 'full'
+        ? rows.length - voting.length
+        : threshold.abstentions;
   return leaning + cannotVoteYes;
 }
 
-/**
- * Movability 0–100: higher for undecided or leaning stances, lower-confidence or
- * thinner records, and cooperative mayor relationships. A prioritization aid,
- * not a probability.
- */
-export function movability(row: MemberRow, direction: Direction): number {
+
+export function movability(row: PresentMemberRow, direction: Direction): number {
   const distance = Math.abs(goalScore(row, direction));
   const base =
     distance === 0
@@ -95,16 +91,6 @@ export function pivotalAnalysis(
   return { goalCount: count, target, mode, candidates };
 }
 
-export function blocRow(rows: MemberRow[]): MemberRow | undefined {
-  const { memberId, votingBlocPattern } = rehearsalRules.blocWatch;
-  return rows.find(
-    (r) =>
-      r.member.id === memberId &&
-      r.participation === 'present' &&
-      votingBlocPattern.test(r.member.voting_bloc),
-  );
-}
-
 /** Present members first, then strongest support to strongest opposition. */
 export function sortRows(rows: MemberRow[]): MemberRow[] {
   return [...rows].sort(
@@ -114,12 +100,11 @@ export function sortRows(rows: MemberRow[]): MemberRow[] {
   );
 }
 
-/** Top outreach ranking for "First three conversations". */
 export function lobbyRanking(
   rows: MemberRow[],
   direction: Direction,
   pivot: PivotalAnalysis,
-): MemberRow[] {
+): PresentMemberRow[] {
   const pool = pivot.candidates.length
     ? pivot.candidates.map((c) => c.row)
     : votingRows(rows).filter((r) => Math.abs(r.score) <= 1);
@@ -131,7 +116,7 @@ export function lobbyRanking(
 }
 
 /** Members most likely to pull a consent item, riskiest first. */
-export function consentObjectors(rows: MemberRow[]): MemberRow[] {
+export function consentObjectors(rows: MemberRow[]): PresentMemberRow[] {
   return votingRows(rows)
     .filter((r) => r.score <= 0)
     .sort((a, b) => a.score - b.score || movability(b, 'support') - movability(a, 'support'));

@@ -4,9 +4,13 @@ interface BulletListProps {
   items: string[];
   render?: (item: string) => ReactNode;
   className?: string;
+  empty?: ReactNode;
 }
 
-export function BulletList({ items, render, className = '' }: BulletListProps) {
+export function BulletList({ items, render, className = '', empty }: BulletListProps) {
+  if (items.length === 0 && empty !== undefined) {
+    return <p className={`text-muted italic ${className}`}>{empty}</p>;
+  }
   return (
     <ul className={`space-y-1.5 ${className}`}>
       {items.map((item) => (
