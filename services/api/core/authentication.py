@@ -30,21 +30,31 @@ class AuthenticatedPrincipal:
     workspace_id: str | None
     role: str | None
     permissions: dict[str, bool] | None = field(default=None)
-    # M4/04: the workspace's vote rules {"bodySize", "majorityThreshold", "quorum"}; None until its Principal sets them.
-    vote_rules: dict[str, int] | None = field(default=None)
+    # M4/04: the workspace's vote rules {"bodySize", "majorityThreshold", "quorum", "actions", "recusal",
+    # "tieBreak"}; None until its Principal sets them. Saved with each simulation run as they were at its start.
+    vote_rules: dict | None = field(default=None)
     is_authenticated = True
 
 
 VOTE_RULE_KEYS = ("bodySize", "majorityThreshold", "quorum")
+# The auth service's RecusalMode and TieBreak; the first of each is its column default.
+RECUSAL_MODES = ("excluded", "present")
+TIE_BREAKS = ("fails", "chair", "passes")
 
 
-def _vote_rules(value) -> dict[str, int] | None:
-    """The vote rules from /auth/me/access, or None if they are not set or not the expected shape."""
+def _vote_rules(value) -> dict | None:
+    """The vote rules from /auth/me/access, or None if they are not set or the three numbers are not the expected
+    shape. The procedure (actions, recusal, tie-break) is kept too, read as leniently as the auth service reads it:
+    non-object actions are dropped, and an unknown recusal or tie-break is its default."""
     if not isinstance(value, dict):
         return None
     rules = {key: value.get(key) for key in VOTE_RULE_KEYS}
     if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 1 for n in rules.values()):
         return None
+    actions = value.get("actions")
+    rules["actions"] = [a for a in actions if isinstance(a, dict)] if isinstance(actions, list) else []
+    rules["recusal"] = value.get("recusal") if value.get("recusal") in RECUSAL_MODES else RECUSAL_MODES[0]
+    rules["tieBreak"] = value.get("tieBreak") if value.get("tieBreak") in TIE_BREAKS else TIE_BREAKS[0]
     return rules
 
 

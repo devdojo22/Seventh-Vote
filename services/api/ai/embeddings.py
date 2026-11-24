@@ -1,21 +1,39 @@
 import logging
+from functools import lru_cache
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from fastembed import TextEmbedding
 from ai.models import DossierEmbedding
 from council.models import Dossier
 from council.simulation_version import simulation_version
 
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
-
 logger = logging.getLogger(__name__)
 
 
-class DossierEmbedder:
-    model = None
+def check_model_dimensions(model_name):
+    """Stops early if the model's vector size doesn't match the database column (checked before any download)."""
+    model_sizes = {m["model"]: m["dim"] for m in TextEmbedding.list_supported_models()}
+    model_size = model_sizes.get(model_name)  # None if fastembed doesn't know the model
+    column_size = DossierEmbedding._meta.get_field("embedding").dimensions
 
+    if model_size != column_size:
+        raise ImproperlyConfigured(
+            f"EMBEDDING_MODEL {model_name!r} can't be used: it makes vectors of size {model_size or 'unknown'}, "
+            f"but the database stores size {column_size}."
+        )
+
+
+@lru_cache(maxsize=None)
+def load_model(model_name, cache_dir):
+    """Loaded once per process (and per configuration)."""
+    check_model_dimensions(model_name)
+    return TextEmbedding(model_name, cache_dir=cache_dir)
+
+
+class DossierEmbedder:
     def __init__(self):
-        if DossierEmbedder.model is None:
-            DossierEmbedder.model = TextEmbedding(MODEL_NAME, cache_dir="/models")
+        self.model = load_model(settings.EMBEDDING_MODEL, settings.EMBEDDING_CACHE_DIR)
 
     def embed_texts(self, texts):
         """Dossier pieces -> one embedding (384 numbers) each."""
