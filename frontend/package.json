@@ -2,7 +2,7 @@
   "name": "seventh-vote-frontend",
   "private": true,
   "version": "0.1.0",
-  "description": "Seventh Vote — frontend-only council rehearsal Tool",
+  "description": "Seventh Vote — The Digital Governing Body Rehearsal Platform",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
+    "@react-pdf/renderer": "^4.9.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.89.0",
@@ -39,5 +40,5 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.71.1",
     "vite": "^6.3.5"
-  }
+    }
 }

@@ -21,6 +21,7 @@ export const METHODOLOGY = {
   limits: [
     'Outputs are hypotheses grounded in the public record, not predictions.',
     'Low-confidence records default to undecided rather than manufacturing certainty.',
+    'Simulated answers are rehearsal language, never quotes: no member is given invented words, and every claim cites the member’s own dossier evidence.',
   ],
   consentLimit:
     'Consent-routed items use an objection-risk lens because any one member may pull an item from consent.',

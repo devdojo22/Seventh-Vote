@@ -1,29 +1,22 @@
+import { thresholdFigure } from '@/lib/simulation/session-summary';
 import type { SessionAnalysis } from '@/types/simulation';
 
 const BOX_CLASS =
-  'relative shrink-0 overflow-hidden rounded-2xl bg-navy px-6 py-4 text-center text-white shadow-elevated sm:min-w-[170px]';
+  'relative shrink-0 overflow-hidden rounded-2xl bg-linear-to-br from-navy to-navy2 px-8 py-5 text-center text-white shadow-elevated sm:min-w-[220px]';
 
 export function ThresholdFigure({ analysis }: { analysis: SessionAnalysis }) {
-  const { threshold, direction, target, goalCount } = analysis;
-
-  const [figure, caption] =
-    threshold.basis === 'consent'
-      ? ['Any 1', 'member may pull from consent']
-      : [
-          `${goalCount} / ${threshold.denominator}`,
-          `${direction === 'oppose' ? 'leaning to oppose' : 'leaning yes'} · ${target} ${direction === 'oppose' ? 'to block' : 'needed'}`,
-        ];
+  const { figure, caption } = thresholdFigure(analysis);
 
   return (
     <div className={BOX_CLASS}>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgb(200_155_60/0.25),transparent_65%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgb(200_155_60/0.16),transparent_65%)]"
       />
-      <strong className="relative block font-display text-3xl leading-none font-bold text-gold2 sm:text-4xl">
+      <strong className="relative block font-display text-4xl leading-none font-bold text-[#f2c46b] sm:text-[44px]">
         {figure}
       </strong>
-      <span className="relative mt-2 block text-[11px] leading-snug font-semibold tracking-wide text-white/75 uppercase">
+      <span className="relative mt-2.5 block text-[11px] leading-snug font-bold tracking-[0.06em] text-white uppercase">
         {caption}
       </span>
     </div>

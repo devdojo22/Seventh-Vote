@@ -2,69 +2,31 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Meter } from '@/components/ui/Meter';
+import { NOTHING_IN_EVIDENCE } from '@/features/simulation/simulation-text';
+import { pivotalCopy } from '@/lib/simulation/session-summary';
 import type { SessionAnalysis } from '@/types/simulation';
-
-function pivotalCopy(analysis: SessionAnalysis) {
-  const { pivot, direction, threshold } = analysis;
-  const side = direction === 'oppose' ? 'opposition' : 'support';
-  const goal =
-    direction === 'oppose' ? `blocking target of ${pivot.target}` : `${threshold.label} threshold`;
-
-  if (pivot.mode === 'reach') {
-    return {
-      title: `One member can become vote ${pivot.target}`,
-      desc: `The projection has ${pivot.goalCount} votes leaning to ${side}. Any member below can reach the ${goal} by moving to the requested side; priority ranks the most movable first.`,
-      goal,
-    };
-  }
-  if (pivot.mode === 'hold') {
-    return {
-      title: `The coalition is exactly at ${pivot.target}`,
-      desc: `Every projected ${side} vote is pivotal: losing any one changes the outcome. Protect the most movable members first.`,
-      goal,
-    };
-  }
-  if (pivot.goalCount < pivot.target - 1) {
-    return {
-      title: 'No single member changes the outcome yet',
-      desc: `The projection has ${pivot.goalCount} votes leaning to ${side}. It takes ${pivot.target - pivot.goalCount} additional shifts to reach ${pivot.target}, so pivotality is currently zero for every member.`,
-      goal,
-    };
-  }
-  const cushion = pivot.goalCount - pivot.target;
-  const margin = cushion
-    ? `; the margin is ${cushion} vote${cushion === 1 ? '' : 's'} above ${pivot.target}`
-    : '';
-  return {
-    title: 'The projected coalition has a cushion',
-    desc: `The projection has ${pivot.goalCount} votes leaning to ${side}. One member flipping would not reverse the outcome${margin}.`,
-    goal,
-  };
-}
 
 export function PivotalPanel({ analysis }: { analysis: SessionAnalysis }) {
   const { pivot } = analysis;
-  const { title, desc, goal } = pivotalCopy(analysis);
-  const action =
-    pivot.mode === 'reach'
-      ? `Persuade for vote ${pivot.target}`
-      : 'Protect the projected coalition';
+  const { title, desc, goal, action } = pivotalCopy(analysis);
 
   return (
-    <Card className="space-y-5">
+    <Card padded={false} className="space-y-6 p-5 sm:p-8">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0">
-          <span className="block text-xs font-bold tracking-[0.14em] text-gold uppercase">
+          <span className="block text-[11px] font-bold tracking-[0.16em] text-gold uppercase">
             Pivotal-voter view
           </span>
-          <h3 className="mt-1 font-display text-xl font-bold text-navy">{title}</h3>
-          <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-muted">{desc}</p>
+          <h3 className="mt-1.5 font-display text-xl font-bold text-navy sm:text-[22px]">
+            {title}
+          </h3>
+          <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-muted sm:text-sm">{desc}</p>
         </div>
-        <div className="shrink-0 rounded-2xl bg-paper px-5 py-3 text-center sm:min-w-[150px]">
+        <div className="w-full shrink-0 rounded-2xl bg-paper px-6 py-4 text-center sm:w-auto sm:min-w-[240px]">
           <strong className="block font-display text-3xl leading-none font-bold text-navy">
             {pivot.candidates.length}
           </strong>
-          <span className="mt-1.5 block text-[11px] leading-tight font-semibold text-muted">
+          <span className="mt-2 block text-xs leading-tight font-semibold text-navy/80">
             single-member flips change result
           </span>
         </div>
@@ -105,7 +67,7 @@ export function PivotalPanel({ analysis }: { analysis: SessionAnalysis }) {
                   {action}
                 </strong>
                 <span className="mt-0.5 block leading-snug text-muted">
-                  {row.levers[0] || 'Lead with a measurable public benefit.'}
+                  {row.answer.levers[0] ?? NOTHING_IN_EVIDENCE}
                 </span>
               </div>
             </li>
@@ -117,7 +79,7 @@ export function PivotalPanel({ analysis }: { analysis: SessionAnalysis }) {
         </EmptyState>
       )}
 
-      <p className="border-t border-line2 pt-4 text-xs leading-relaxed text-muted">
+      <p className="border-t border-line2 pt-5 text-xs leading-relaxed text-muted">
         Pivotality is 1 only when changing this member’s projected side alone crosses the {goal}.
         Movability is higher for undecided or leaning stances, thinner or lower-confidence records,
         and a cooperative mayor relationship; it is a prioritization aid, not a probability.

@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/Badge';
 import { BulletList } from '@/components/ui/BulletList';
 import { ChevronDownIcon } from '@/components/ui/icons';
 import { UnreviewedBadge } from '@/features/dossiers/DossierBadges'; // M4/01
-import { questions } from '@/lib/simulation/scoring';
-import type { MemberRow, SessionInput } from '@/types/simulation';
+import { NOT_A_QUOTE, NOTHING_IN_EVIDENCE } from '@/features/simulation/simulation-text';
+import { hasNoDirectEvidence } from '@/lib/simulation/member-rows';
+import type { MemberRow } from '@/types/simulation';
 import { EvidenceTrace } from './EvidenceTrace';
 
 function participationLabel(row: MemberRow): string {
@@ -14,16 +15,20 @@ function participationLabel(row: MemberRow): string {
   return `${row.participation === 'absent' ? 'Absent' : 'Recused'} · not counted`;
 }
 
+function notSimulatedText(row: MemberRow): string {
+  return `Not simulated: ${row.participation === 'recused' ? 'recused' : 'absent'} members don’t vote on this item.`;
+}
+
 function DetailBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="space-y-2 rounded-xl border border-line bg-white p-4">
-      <h4 className="text-[11px] font-bold tracking-[0.12em] text-muted uppercase">{title}</h4>
+    <div className="space-y-3 rounded-xl border border-line bg-paper/70 p-4 sm:p-5">
+      <h4 className="text-[11px] font-bold tracking-[0.12em] text-navy/80 uppercase">{title}</h4>
       {children}
     </div>
   );
 }
 
-export function MemberReadCard({ row, input }: { row: MemberRow; input: SessionInput }) {
+export function MemberReadCard({ row }: { row: MemberRow }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
 
@@ -37,15 +42,15 @@ export function MemberReadCard({ row, input }: { row: MemberRow; input: SessionI
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((o) => !o)}
-          className="grid w-full cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2.5 px-4 py-3.5 text-left select-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset focus-visible:outline-none sm:px-5 lg:grid-cols-[minmax(200px,1fr)_auto_minmax(0,1.4fr)_auto]"
+          className="grid w-full cursor-pointer grid-cols-[1fr_auto] items-center gap-x-5 gap-y-2.5 px-4 py-4 text-left select-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset focus-visible:outline-none sm:px-5 lg:grid-cols-[minmax(0,1fr)_17rem_minmax(0,1.15fr)_auto]"
         >
-          <span className="flex min-w-0 items-center gap-3">
-            <Avatar name={row.member.name} size="sm" />
+          <span className="flex min-w-0 items-center gap-3.5">
+            <Avatar name={row.member.name} size="md" />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-navy">
+              <span className="block truncate text-[15px] font-bold text-navy">
                 {row.member.name}
               </span>
-              <small className="block truncate text-xs font-normal text-muted">
+              <small className="block truncate text-[13px] font-normal text-muted">
                 {row.member.district}
               </small>
             </span>
@@ -53,55 +58,84 @@ export function MemberReadCard({ row, input }: { row: MemberRow; input: SessionI
 
           <span
             aria-hidden="true"
-            className={`grid size-8 shrink-0 place-items-center rounded-full border border-line text-muted transition-transform lg:order-last ${open ? 'rotate-180 bg-paper' : ''}`}
+            className={`grid size-9 shrink-0 place-items-center rounded-full border border-line bg-white text-navy transition-transform lg:order-last ${open ? 'rotate-180' : ''}`}
           >
             <ChevronDownIcon className="size-4" />
           </span>
 
           <span className="col-span-2 flex flex-wrap items-center gap-1.5 lg:col-span-1">
-            <StancePill stance={row.stance} />
+            {row.stance && <StancePill stance={row.stance} />}
             <Badge
               className={
                 row.participation === 'present'
-                  ? undefined
+                  ? 'border border-line bg-white text-navy/80'
                   : 'border border-gold/40 bg-amber-bg text-amber'
               }
             >
               {participationLabel(row)}
             </Badge>
+            {row.participation === 'present' && hasNoDirectEvidence(row) && (
+              <Badge className="border border-gold/40 bg-amber-bg text-amber">
+                No direct evidence
+              </Badge>
+            )}
             {/* M4/01 */}
             {row.member.basis === 'unreviewed' && <UnreviewedBadge />}
           </span>
 
-          <span className="col-span-2 line-clamp-2 text-xs font-normal text-muted italic lg:col-span-1 lg:line-clamp-1">
-            {row.reason} <em className="text-muted/70 not-italic">Simulated, not a quote.</em>
+          <span className="col-span-2 line-clamp-2 text-[13px] font-normal text-muted italic lg:col-span-1 lg:line-clamp-1">
+            {row.answer ? (
+              <>
+                {row.answer.answer}{' '}
+                <em className="text-muted/70 not-italic">Simulated, not a quote.</em>
+              </>
+            ) : (
+              notSimulatedText(row)
+            )}
           </span>
         </button>
       </h3>
 
       {open && (
-        <div
-          id={panelId}
-          className="animate-fade-in space-y-3 border-t border-line2 bg-paper/60 p-4 sm:p-5"
-        >
-          <div className="grid grid-cols-1 gap-3 text-xs text-ink/80 sm:grid-cols-2 xl:grid-cols-4">
-            <DetailBlock title="In their voice">
-              <p className="leading-relaxed font-medium text-navy">{row.reason}</p>
-              <p className="text-[11px] text-muted italic">
-                Rehearsal language; not a verbatim quote.
+        <div id={panelId} className="animate-fade-in space-y-3.5 border-t border-line2 p-4 sm:p-5">
+          {row.answer ? (
+            <>
+              <div className="grid grid-cols-1 gap-3.5 text-[13px] leading-relaxed text-ink/85 sm:grid-cols-2 xl:grid-cols-4">
+                <DetailBlock title="In their voice">
+                  <p className="text-ink/85">{row.answer.answer}</p>
+                  <p className="text-xs text-muted italic">{NOT_A_QUOTE}</p>
+                </DetailBlock>
+                <DetailBlock title="Top concerns">
+                  <BulletList
+                    items={row.answer.concerns}
+                    empty={NOTHING_IN_EVIDENCE}
+                    className="space-y-2.5"
+                  />
+                </DetailBlock>
+                <DetailBlock title="Questions they may ask">
+                  <BulletList
+                    items={row.answer.questions}
+                    empty={NOTHING_IN_EVIDENCE}
+                    className="space-y-2.5"
+                  />
+                </DetailBlock>
+                <DetailBlock title="What could move them">
+                  <BulletList
+                    items={row.answer.levers}
+                    empty={NOTHING_IN_EVIDENCE}
+                    className="space-y-2.5"
+                  />
+                </DetailBlock>
+              </div>
+              <p className="rounded-xl border border-line bg-white px-4 py-3.5 text-[13px] leading-relaxed text-ink/85 sm:px-5">
+                <strong className="font-bold text-navy">Why this read</strong> ·{' '}
+                {row.answer.reasoning}
               </p>
-            </DetailBlock>
-            <DetailBlock title="Top concerns">
-              <BulletList items={row.concerns} />
-            </DetailBlock>
-            <DetailBlock title="Questions they may ask">
-              <BulletList items={questions(row, input)} />
-            </DetailBlock>
-            <DetailBlock title="What could move them">
-              <BulletList items={row.levers} />
-            </DetailBlock>
-          </div>
-          <EvidenceTrace row={row} />
+              <EvidenceTrace citations={row.answer.citations} />
+            </>
+          ) : (
+            <p className="text-xs text-muted">{notSimulatedText(row)}</p>
+          )}
         </div>
       )}
     </article>

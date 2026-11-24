@@ -1,4 +1,3 @@
-import { rehearsalRules } from '@/data/rehearsal-rules';
 import { isHttpUrl } from '@/lib/url';
 import type { CouncilConfig, CouncilOfficer } from '@/types/council';
 import type { Member, PoliticalStyle, TwinVoice } from '@/types/member';
@@ -7,7 +6,6 @@ import type { Citation } from '@/types/simulation';
 export type MayorPosture = 'ally' | 'independent' | 'critic';
 export type RecordDepthLabel = 'Strong' | 'Moderate' | 'Thin';
 
-const THIN_RECORD_PENALTY = 3;
 const FULL_RECORD_SCORE = 20;
 const MAX_DOSSIER_SOURCES = 15;
 const NO_LEADERSHIP_ROLE = /^\s*none/i;
@@ -41,11 +39,10 @@ export const POSTURE_CLASSES: Record<MayorPosture, string> = {
 };
 
 export function recordDepth(member: Member): { label: RecordDepthLabel; percent: number } {
-  let score =
+  const score =
     member.key_votes.length +
     Object.keys(member.issue_positions).length * 2 +
     member.notable_quotes.filter((q) => isHttpUrl(q.source_url)).length;
-  if (rehearsalRules.thinRecordMemberIds.includes(member.id)) score -= THIN_RECORD_PENALTY;
   const percent = Math.round(Math.min(100, Math.max(0, (score / FULL_RECORD_SCORE) * 100)));
   if (score >= 16) return { label: 'Strong', percent };
   if (score >= 11) return { label: 'Moderate', percent };

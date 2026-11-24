@@ -1,11 +1,11 @@
 import { StancePill } from '@/components/StancePill';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { NOTHING_IN_EVIDENCE } from '@/features/simulation/simulation-text';
 import { useCouncilStore } from '@/stores/council-store';
-import type { MemberRow } from '@/types/simulation';
+import type { PresentMemberRow } from '@/types/simulation';
 
-/** Consent lens: objection risk instead of a passage count. */
-export function ConsentPanel({ objectors }: { objectors: MemberRow[] }) {
+export function ConsentPanel({ objectors }: { objectors: PresentMemberRow[] }) {
   const consentNote = useCouncilStore((s) => s.config.procedure.consentNote);
 
   return (
@@ -24,7 +24,7 @@ export function ConsentPanel({ objectors }: { objectors: MemberRow[] }) {
               <strong className="font-semibold text-navy">{r.member.name}</strong>
               <span className="flex flex-wrap items-center gap-2 text-muted">
                 <StancePill stance={r.stance} />
-                {r.concerns[0] || 'No specific objection trigger documented'}
+                {r.answer.concerns[0] ?? NOTHING_IN_EVIDENCE}
               </span>
             </li>
           ))}

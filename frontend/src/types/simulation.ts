@@ -1,4 +1,6 @@
-import type { IssuePosition, KeyVote, Member, MemberId } from './member';
+import type { RecusalMode, TieBreak } from '@/features/access/access-api';
+import type { SimulationAnswer } from '@/features/simulation/simulation-api';
+import type { Member, MemberId } from './member';
 
 export const CATEGORY_IDS = [
   'budget_taxes',
@@ -21,16 +23,7 @@ export const ASKS = [
 ] as const;
 export type Ask = (typeof ASKS)[number];
 
-export const ACTION_TYPES = [
-  'ordinary',
-  'censure',
-  'rules_amendment',
-  'appeal_chair',
-  'defer_drop',
-  'order_business',
-  'consent',
-] as const;
-export type ActionType = (typeof ACTION_TYPES)[number];
+export type ActionType = string;
 
 export const FISCAL_IMPACTS = ['cost', 'neutral', 'revenue'] as const;
 export type FiscalImpact = (typeof FISCAL_IMPACTS)[number];
@@ -45,12 +38,31 @@ export const ATTENDANCE_STATUSES = ['present', 'absent', 'recused'] as const;
 export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
 
 export type StanceScore = -2 | -1 | 0 | 1 | 2;
-export type StanceLabel =
-  'Strong Oppose' | 'Lean Oppose' | 'Undecided' | 'Lean Support' | 'Strong Support';
+export const STANCE_LABELS = [
+  'Strong Oppose',
+  'Lean Oppose',
+  'Undecided',
+  'Lean Support',
+  'Strong Support',
+] as const;
+export type StanceLabel = (typeof STANCE_LABELS)[number];
 
-export type Confidence = 'High' | 'Medium' | 'Low';
+export const CONFIDENCES = ['High', 'Medium', 'Low'] as const;
+export type Confidence = (typeof CONFIDENCES)[number];
 
-/** Which side of the vote the user wants: to pass the item or to block it. */
+export const SIMULATION_RUN_STATUSES = ['running', 'done', 'failed'] as const;
+export type SimulationRunStatus = (typeof SIMULATION_RUN_STATUSES)[number];
+
+export const EVIDENCE_PIECE_KINDS = [
+  'key_record',
+  'quote',
+  'issue_position',
+  'profile',
+  'political_style',
+  'voting_bloc',
+] as const;
+export type EvidencePieceKind = (typeof EVIDENCE_PIECE_KINDS)[number];
+
 export type Direction = 'support' | 'oppose';
 
 export interface SessionInput {
@@ -68,45 +80,48 @@ export interface SessionInput {
   attendance: Record<MemberId, AttendanceStatus>;
 }
 
-export interface Evidence {
-  category: CategoryId;
-  position: IssuePosition | null;
-  votes: KeyVote[];
-  count: number;
-}
-
-export interface MemberRow {
+export type MemberRow = {
   member: Member;
-  score: StanceScore;
-  stance: StanceLabel;
-  confidence: Confidence;
-  participation: AttendanceStatus;
-  /** Simulated reasoning in rehearsal language, never a quote. */
-  reason: string;
-  concerns: string[];
-  levers: string[];
-  evidence: Evidence;
-}
+} & (
+  | {
+      participation: 'present';
+      stance: StanceLabel;
+      score: StanceScore;
+      confidence: Confidence;
+      answer: SimulationAnswer;
+    }
+  | {
+      participation: Exclude<AttendanceStatus, 'present'>;
+      stance: null;
+      score: 0;
+      confidence: null;
+      answer: null;
+    }
+);
+
+export type PresentMemberRow = Extract<MemberRow, { participation: 'present' }>;
 
 export interface Threshold {
   ruleId: ActionType;
   basis: 'full' | 'present' | 'consent';
-  /** False when the rule is a working inference rather than a confirmed rule. */
   verified: boolean;
-  /** Votes needed to pass. */
   needed: number;
   denominator: number;
-  /** False when nobody can vote under this rule (zero present on a present-majority rule). */
   reachable: boolean;
   label: string;
   note: string;
+  abstentions: number;
+}
+
+export interface VoteProcedure {
+  recusal: RecusalMode;
+  tieBreak: TieBreak;
 }
 
 export type PivotalMode = 'reach' | 'hold' | 'none';
 
 export interface PivotalCandidate {
-  row: MemberRow;
-  /** 0–100 movability score. */
+  row: PresentMemberRow;
   priority: number;
 }
 
@@ -130,20 +145,25 @@ export interface TallySegment {
 export interface SessionAnalysis {
   rule: ActionRule;
   rows: MemberRow[];
-  voting: MemberRow[];
+  voting: PresentMemberRow[];
   notVoting: number;
   threshold: Threshold;
   direction: Direction;
-  /** Goal-side votes needed: to pass, or to block. */
   target: number;
   goalCount: number;
   outcome: SessionOutcome;
   tally: TallySegment[];
   breakdown: { solid: number; persuadable: number; counter: number };
   pivot: PivotalAnalysis;
-  lobby: MemberRow[];
-  consentObjectors: MemberRow[];
-  blocRow: MemberRow | undefined;
+  lobby: PresentMemberRow[];
+  consentObjectors: PresentMemberRow[];
+  evidenceGap: EvidenceGap;
+}
+
+export interface EvidenceGap {
+  members: PresentMemberRow[];
+  /** These members alone could reverse the projected result, so it should not be relied on. */
+  decisive: boolean;
 }
 
 export interface Citation {
@@ -156,40 +176,25 @@ export interface Citation {
 interface RuleBase {
   id: ActionType;
   label: string;
-  /** False when the threshold is a working inference rather than a confirmed rule. */
   verified: boolean;
   note: string;
 }
 
-/** Passage rule for one procedural action. 'present' rules need a majority of members present. */
+export interface PresentFraction {
+  numerator: number;
+  denominator: number;
+}
+
 export type ActionRule = RuleBase &
-  ({ basis: 'full'; needed: number } | { basis: 'present' } | { basis: 'consent' });
+  (
+    | { basis: 'full'; needed: number }
+    | { basis: 'present'; fraction?: PresentFraction }
+    | { basis: 'consent' }
+  );
 
 export interface StanceDefinition {
   score: StanceScore;
   label: StanceLabel;
   pillClass: string;
   barClass: string;
-}
-
-export interface RehearsalRules {
-  moratorium: {
-    leadSponsorId: MemberId;
-    sponsorIds: readonly MemberId[];
-    sponsorReasons: {
-      lead: { support: string; oppose: string };
-      cosponsor: { support: string; oppose: string };
-    };
-  };
-  loganMoratorium: {
-    memberId: MemberId;
-    voteDate: string;
-    positionPattern: RegExp;
-    reasons: { support: string; oppose: string };
-  };
-  /** Members with no verified verbatim quotes: the engine must not invent a direct voice. */
-  noDirectVoiceMemberIds: readonly MemberId[];
-  /** Members whose public record is thinner than their dossier size suggests. */
-  thinRecordMemberIds: readonly MemberId[];
-  blocWatch: { memberId: MemberId; votingBlocPattern: RegExp };
 }
