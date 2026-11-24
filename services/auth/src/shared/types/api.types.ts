@@ -78,16 +78,41 @@ export interface WorkspaceResponse {
   createdAt: string;
 }
 
+export type VoteThreshold =
+  | { type: 'count'; needed: number }
+  | { type: 'fraction'; numerator: number; denominator: number; of: 'seats' | 'present' }
+  | { type: 'present_majority' }
+  | { type: 'consent' };
+
+export interface ActionVoteRule {
+  id: string;
+  label: string;
+  threshold: VoteThreshold;
+  note: string;
+  verified: boolean;
+}
+
+export const RECUSAL_MODES = ['excluded', 'present'] as const;
+export type RecusalMode = (typeof RECUSAL_MODES)[number];
+export const TIE_BREAKS = ['fails', 'chair', 'passes'] as const;
+export type TieBreak = (typeof TIE_BREAKS)[number];
+
 export interface VoteRules {
   bodySize: number;
   majorityThreshold: number;
   quorum: number;
+  actions: ActionVoteRule[];
+  recusal: RecusalMode;
+  tieBreak: TieBreak;
 }
+
+export type VoteProcedure = Pick<VoteRules, 'actions' | 'recusal' | 'tieBreak'>;
 
 export interface WorkspaceSettingsResponse {
   workspaceId: string;
   name: string;
   voteRules: VoteRules | null;
+  voteProcedure: VoteProcedure;
   canConfigure: boolean;
   updatedAt: string;
 }

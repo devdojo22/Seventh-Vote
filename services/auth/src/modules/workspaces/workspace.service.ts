@@ -8,6 +8,7 @@ import type {
   InvitationResponse,
   MemberResponse,
   MembersResponse,
+  VoteRules,
   WorkspaceResponse,
   WorkspaceSettingsResponse,
 } from '../../shared/types/api.types.js';
@@ -22,7 +23,13 @@ import type {
   MembershipWithUser,
   TransferResult,
 } from './membership.repository.js';
-import { voteRulesOf } from './vote-rules.js';
+import {
+  mergeVoteRules,
+  toVoteRulesUpdate,
+  voteProcedureOf,
+  voteRulesOf,
+  voteRulesProblems,
+} from './vote-rules.js';
 import { WORKSPACE_ARCHIVED } from './workspace-access.service.js';
 import type {
   CreateWorkspaceInput,
@@ -59,6 +66,7 @@ function toSettingsResponse(workspace: Workspace, canConfigure: boolean): Worksp
     workspaceId: workspace.id,
     name: workspace.name,
     voteRules: voteRulesOf(workspace),
+    voteProcedure: voteProcedureOf(workspace),
     canConfigure,
     updatedAt: workspace.updatedAt.toISOString(),
   };
@@ -308,20 +316,35 @@ export class WorkspaceService {
   async updateVoteRules(
     actorId: string,
     workspaceId: string,
-    rules: VoteRulesInput,
+    input: VoteRulesInput,
     context: RequestContext,
   ): Promise<WorkspaceSettingsResponse> {
-    const workspace = await this.deps.workspaces.updateVoteRules(workspaceId, {
-      voteBodySize: rules.bodySize,
-      voteMajorityThreshold: rules.majorityThreshold,
-      voteQuorum: rules.quorum,
+    let rules: VoteRules | undefined;
+    const workspace = await this.deps.workspaces.updateVoteRules(workspaceId, (current) => {
+      const merged = mergeVoteRules(input, current);
+      const problems = voteRulesProblems(merged);
+      if (problems.length > 0) {
+        throw new HttpError(400, 'Validation failed', {
+          code: 'validation_failed',
+          details: { formErrors: [], fieldErrors: { voteRules: problems } },
+        });
+      }
+      rules = merged;
+      return toVoteRulesUpdate(merged);
     });
-    if (!workspace) throw new HttpError(404, 'Workspace not found');
+    if (!workspace || !rules) throw new HttpError(404, 'Workspace not found');
     await this.deps.audit.record(context, {
       action: 'workspace.settings_updated',
       userId: actorId,
       workspaceId,
-      meta: { bodySize: rules.bodySize, majorityThreshold: rules.majorityThreshold, quorum: rules.quorum },
+      meta: {
+        bodySize: rules.bodySize,
+        majorityThreshold: rules.majorityThreshold,
+        quorum: rules.quorum,
+        actions: rules.actions.map((a) => a.id).join(', '),
+        recusal: rules.recusal,
+        tieBreak: rules.tieBreak,
+      },
     });
     return toSettingsResponse(workspace, true);
   }

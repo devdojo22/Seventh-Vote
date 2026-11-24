@@ -32,6 +32,9 @@ export interface VoteRulesUpdate {
   voteBodySize: number;
   voteMajorityThreshold: number;
   voteQuorum: number;
+  voteActions: Prisma.InputJsonValue;
+  voteRecusal: string;
+  voteTieBreak: string;
 }
 
 export type LifecycleResult = 'done' | 'not-found' | 'already-in-state';
@@ -78,12 +81,13 @@ async function deleteAppData(tx: Prisma.TransactionClient, workspaceId: string):
 
 export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
-  updateVoteRules(id: string, rules: VoteRulesUpdate): Promise<Workspace | null>;
+  updateVoteRules(
+    id: string,
+    build: (current: Workspace) => VoteRulesUpdate,
+  ): Promise<Workspace | null>;
   create(workspace: NewWorkspace): Promise<Workspace | null>;
   listOverview(now: Date): Promise<WorkspaceOverview[]>;
-  /** Current Affiliate seat usage; null when the workspace does not exist. */
   readAffiliateSeats(id: string, now: Date): Promise<AffiliateSeatUsage | null>;
-  /** Sets the limit (null: unlimited) and records workspace.seat_limit_updated when it changed, atomically. */
   updateSeatLimit(id: string, seatLimit: number | null, actor: SeatLimitActor, now: Date): Promise<SeatLimitResult>;
   archive(id: string, now: Date): Promise<LifecycleResult>;
   restore(id: string): Promise<LifecycleResult>;
@@ -97,9 +101,16 @@ export class PrismaWorkspaceRepository implements WorkspaceRepository {
     return this.prisma.workspace.findUnique({ where: { id } });
   }
 
-  async updateVoteRules(id: string, rules: VoteRulesUpdate): Promise<Workspace | null> {
-    const { count } = await this.prisma.workspace.updateMany({ where: { id }, data: rules });
-    return count === 1 ? this.findById(id) : null;
+  async updateVoteRules(
+    id: string,
+    build: (current: Workspace) => VoteRulesUpdate,
+  ): Promise<Workspace | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT 1 FROM workspaces WHERE id = ${id}::uuid FOR UPDATE`;
+      const current = await tx.workspace.findUnique({ where: { id } });
+      if (!current) return null;
+      return tx.workspace.update({ where: { id }, data: build(current) });
+    });
   }
 
   async create(workspace: NewWorkspace): Promise<Workspace | null> {
@@ -119,7 +130,6 @@ export class PrismaWorkspaceRepository implements WorkspaceRepository {
         _count: { select: { memberships: true } },
       },
     });
-    // Seat counts come from two grouped queries rather than one count per workspace.
     const ids = workspaces.map(({ id }) => id);
     const affiliates = await this.prisma.membership.groupBy({
       by: ['workspaceId'],
@@ -149,10 +159,6 @@ export class PrismaWorkspaceRepository implements WorkspaceRepository {
     return readAffiliateSeatUsage(this.prisma, id, now);
   }
 
-  /**
-   * Under the workspace lock, so the previous value recorded in the audit entry is exact and no invitation or
-   * acceptance interleaves. Lowering the limit below usage leaves every membership and invitation untouched.
-   */
   updateSeatLimit(id: string, seatLimit: number | null, actor: SeatLimitActor, now: Date): Promise<SeatLimitResult> {
     return this.prisma.$transaction(async (tx): Promise<SeatLimitResult> => {
       await lockWorkspace(tx, id);
