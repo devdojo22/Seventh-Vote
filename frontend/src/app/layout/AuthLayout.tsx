@@ -41,10 +41,10 @@ function BrandPanel() {
 
       <div className="relative my-auto py-12">
         <p className="mb-3 text-xs font-bold tracking-[0.14em] text-gold uppercase">
-          Secure council simulation
+          The Digital Governing Body Rehearsal Platform
         </p>
         <h2 className="max-w-md font-display text-[40px] leading-[1.08] font-bold tracking-tight">
-          Know your count before the count.
+          Never too soon to read the room.
         </h2>
         <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/65">
           Rehearse agenda items against your council’s public-record dossiers, find the pivotal

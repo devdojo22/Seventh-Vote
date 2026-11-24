@@ -32,7 +32,7 @@ export function TopBar() {
         </Link>
         <span aria-hidden="true" className={`${DIVIDER_CLASS} h-5 md:block lg:hidden`} />
         <span className="hidden min-w-0 truncate text-[13px] text-white/65 lg:inline">
-          Know your count before the count — public-record rehearsal, not prediction
+          Never too soon to read the room — public-record rehearsal, not prediction
         </span>
         <span
           title={snapshotLabel}
